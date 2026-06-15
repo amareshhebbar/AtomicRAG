@@ -1,21 +1,3 @@
-"""
-train/stage3_orpo.py
---------------------
-Stage 3: ORPO alignment — teaches the model to prefer good decompositions.
-
-ORPO trains on (chosen, rejected) pairs without a reference model.
-The model learns to reject 5 failure modes:
-  merged_hops, hallucinated, zero_decomp, over_decomp, missing_hop
-
-Prerequisites:
-  python train/merge_and_push.py --stage 2   → outputs/stage2_merged/
-  python scripts/build_orpo_pairs.py          → data/processed/orpo_dataset/
-
-Run:
-    python train/stage3_orpo.py               # RunPod GPU
-    python train/stage3_orpo.py --local_test  # Laptop CPU
-"""
-
 import os
 import sys
 import argparse
@@ -39,8 +21,6 @@ def parse_args():
 
 def main():
     args = parse_args()
-
-    # Block GPU BEFORE torch imports
     if args.local_test:
         os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
@@ -57,8 +37,6 @@ def main():
         sys.exit(1)
 
     on_cpu = args.local_test or not torch.cuda.is_available()
-
-    # ── Build overrides dict FIRST, then apply local_test extras ─────────────
     overrides = {}
     if args.orpo_beta:   overrides["orpo_beta"]          = args.orpo_beta
     if args.max_samples: overrides["max_train_samples"]   = args.max_samples
@@ -89,7 +67,6 @@ def main():
     print_config(cfg)
     print(f"\n  Mode: {'CPU (local_test)' if on_cpu else 'GPU (RunPod)'}")
 
-    # ── Base model — Stage 2 merged, or fall back ─────────────────────────────
     base_model_path = args.base_model
     if not base_model_path:
         merged = ROOT / "outputs" / "stage2_merged"
@@ -100,7 +77,6 @@ def main():
             base_model_path = cfg.base_model_id
             print(f"  Stage 2 merged not found → using base: {base_model_path}")
 
-    # ── Paths ─────────────────────────────────────────────────────────────────
     output_dir        = ROOT / cfg.output_dir
     orpo_dataset_path = ROOT / cfg.orpo_dataset_path
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -110,7 +86,6 @@ def main():
         print("  Run: python scripts/build_orpo_pairs.py")
         sys.exit(1)
 
-    # ── W&B ───────────────────────────────────────────────────────────────────
     if cfg.report_to == "wandb":
         wandb.init(
             project=cfg.wandb_project,
@@ -121,11 +96,9 @@ def main():
         )
         print(f"  ✓ W&B: {cfg.wandb_project}/{cfg.run_name}")
 
-    # ── Model ─────────────────────────────────────────────────────────────────
     model, tokenizer = load_model_for_training(cfg, model_id_override=base_model_path)
     print_model_summary(model)
 
-    # ── Data ──────────────────────────────────────────────────────────────────
     train_ds = ORPODataset(str(orpo_dataset_path), tokenizer, cfg,
                            "train",      cfg.max_train_samples)
     has_val  = True
@@ -139,7 +112,6 @@ def main():
         eval_ds = None
         has_val = False
 
-    # ── ORPOConfig ────────────────────────────────────────────────────────────
     use_bf16 = cfg.bf16 and not on_cpu
     use_fp16 = cfg.fp16 and not on_cpu
 
@@ -175,7 +147,6 @@ def main():
         dataloader_num_workers      = cfg.dataloader_num_workers,
     )
 
-    # ── Train ─────────────────────────────────────────────────────────────────
     trainer = ORPOTrainer(
         model            = model,
         args             = orpo_args,
@@ -191,8 +162,7 @@ def main():
     print(f"{'═'*56}\n")
 
     trainer.train()
-
-    # ── Save ──────────────────────────────────────────────────────────────────
+    
     final_dir = output_dir / "final"
     final_dir.mkdir(exist_ok=True)
     model.save_pretrained(str(final_dir))

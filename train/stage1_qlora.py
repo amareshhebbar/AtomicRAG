@@ -1,20 +1,21 @@
-"""
-train/stage1_qlora.py
----------------------
-Stage 1: QLoRA Supervised Fine-Tuning.
-
-Laptop test (CPU, 30 rows, ~15 min):
-    python train/stage1_qlora.py --local_test
-
-RunPod full training (GPU, all data):
-    python train/stage1_qlora.py
-"""
-
 import os
 import sys
 import json
 import argparse
 from pathlib import Path
+try:
+    import torch
+    import wandb
+    from transformers import TrainingArguments, Trainer
+    from src.config  import get_config, print_config
+    from src.model   import load_model_for_training, print_model_summary
+    from src.dataset import SFTDataset, get_sft_collator, decode_batch_sample
+    from src.utils   import parse_decomp_output, format_dep_graph, build_prompt
+    from transformers import TrainerCallback
+except ImportError as e:
+    print(f"[ERROR] Missing package: {e}")
+    print("  Run: pip install torch transformers peft bitsandbytes trl accelerate wandb")
+    sys.exit(1)
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -36,43 +37,28 @@ def parse_args():
 
 def main():
     args = parse_args()
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # MUST be set BEFORE torch is imported.
-    # Setting CUDA_VISIBLE_DEVICES="" makes torch.cuda.is_available() = False
-    # so Trainer never tries to move the model to GPU.
-    # This is the only reliable way across all transformers versions.
-    # ─────────────────────────────────────────────────────────────────────────
     if args.local_test:
         os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
-    # ── Imports ───────────────────────────────────────────────────────────────
-    try:
-        import torch
-        import wandb
-        from transformers import TrainingArguments, Trainer
-        from src.config  import get_config, print_config
-        from src.model   import load_model_for_training, print_model_summary
-        from src.dataset import SFTDataset, get_sft_collator, decode_batch_sample
-        from src.utils   import parse_decomp_output, format_dep_graph, build_prompt
-    except ImportError as e:
-        print(f"[ERROR] Missing package: {e}")
-        print("  Run: pip install torch transformers peft bitsandbytes trl accelerate wandb")
-        sys.exit(1)
-
     on_cpu = args.local_test or not torch.cuda.is_available()
 
-    # ── Config ────────────────────────────────────────────────────────────────
     stage = "local_test" if args.local_test else "stage1"
 
     overrides = {}
-    if args.lora_r:        overrides["lora_r"]                     = args.lora_r
-    if args.lora_alpha:    overrides["lora_alpha"]                  = args.lora_alpha
-    if args.learning_rate: overrides["learning_rate"]               = args.learning_rate
-    if args.num_epochs:    overrides["num_train_epochs"]            = args.num_epochs
-    if args.batch_size:    overrides["per_device_train_batch_size"] = args.batch_size
-    if args.max_samples:   overrides["max_train_samples"]           = args.max_samples
-    if args.no_wandb:      overrides["report_to"]                   = "none"
+    if args.lora_r:        
+        overrides["lora_r"] = args.lora_r
+    if args.lora_alpha:    
+        overrides["lora_alpha"] = args.lora_alpha
+    if args.learning_rate: 
+        overrides["learning_rate"]= args.learning_rate
+    if args.num_epochs:    
+        overrides["num_train_epochs"] = args.num_epochs
+    if args.batch_size:    
+        overrides["per_device_train_batch_size"] = args.batch_size
+    if args.max_samples:   
+        overrides["max_train_samples"]= args.max_samples
+    if args.no_wandb:      
+        overrides["report_to"] = "none"
 
     cfg = get_config(stage, **overrides)
     print_config(cfg)
@@ -80,13 +66,11 @@ def main():
     print(f"\n  Mode: {'CPU (local_test)' if on_cpu else 'GPU (RunPod)'}")
     print(f"  torch.cuda.is_available() = {torch.cuda.is_available()}")
 
-    # ── Paths ─────────────────────────────────────────────────────────────────
     output_dir      = ROOT / cfg.output_dir
     hf_dataset_path = ROOT / cfg.hf_dataset_path
     output_dir.mkdir(parents=True, exist_ok=True)
     cfg.save(str(output_dir / "config.json"))
-
-    # ── W&B ───────────────────────────────────────────────────────────────────
+    
     if cfg.report_to == "wandb":
         wandb.init(
             project=cfg.wandb_project,
@@ -97,11 +81,9 @@ def main():
         )
         print(f"  ✓ W&B: {cfg.wandb_project}/{cfg.run_name}")
 
-    # ── Model ─────────────────────────────────────────────────────────────────
     model, tokenizer = load_model_for_training(cfg)
     print_model_summary(model)
 
-    # ── Data ──────────────────────────────────────────────────────────────────
     if not hf_dataset_path.exists():
         print(f"\n[ERROR] Dataset not found: {hf_dataset_path}")
         print("  Run: make data  or  make data MAX_ROWS=30")
@@ -124,7 +106,6 @@ def main():
 
     collator = get_sft_collator(tokenizer, cfg.max_seq_length)
 
-    # Sanity check
     if len(train_ds) > 0:
         batch = collator([train_ds[0]])
         n_active = (batch["labels"] != -100).sum().item()
@@ -133,12 +114,9 @@ def main():
         if on_cpu:
             print(decode_batch_sample(batch, tokenizer, 0))
 
-    # ── TrainingArguments ─────────────────────────────────────────────────────
     has_eval  = len(eval_ds) > 0
     load_best = cfg.load_best_model_at_end and has_eval
 
-    # bf16/fp16: only on GPU. CUDA_VISIBLE_DEVICES="" already handles it
-    # but be explicit in case someone runs without --local_test on a CPU box.
     use_bf16 = cfg.bf16 and not on_cpu
     use_fp16 = cfg.fp16 and not on_cpu
 
@@ -173,9 +151,8 @@ def main():
         remove_unused_columns       = False,
         label_names                 = ["labels"],
     )
-
-    # ── Callbacks ─────────────────────────────────────────────────────────────
-    from transformers import TrainerCallback
+    
+    
 
     class SampleOutputCallback(TrainerCallback):
         QUESTIONS = [
@@ -208,7 +185,6 @@ def main():
             if logs:
                 logs["vram_gb"] = torch.cuda.memory_allocated() / 1e9
 
-    # ── Train ─────────────────────────────────────────────────────────────────
     trainer = Trainer(
         model             = model,
         args              = training_args,

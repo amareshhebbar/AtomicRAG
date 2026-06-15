@@ -185,7 +185,7 @@ def _resolve_packages() -> list:
             if "CUDA Version" in line:
                 parts = line.split("CUDA Version:")
                 if len(parts) > 1:
-                    cuda_ver = parts[1].strip().split()[0]   # e.g. "12.8"
+                    cuda_ver = parts[1].strip().split()[0]   
                     break
     except Exception:
         pass
@@ -392,7 +392,6 @@ def _log_eval_wandb(results, dry):
         sp  = next((s for s in results.get("eval_speed",[]) if "QueryDecomp" in s.get("label","")), {}) \
               if isinstance(results.get("eval_speed"), list) else {}
 
-        # Log individual metrics
         for m in ["json_parse_rate","hop_count_acc","hop_coverage_f1","dep_graph_acc"]:
             if m in ft: wandb.log({f"eval/finetuned/{m}": ft[m]})
             if m in bs: wandb.log({f"eval/baseline/{m}": bs[m]})
@@ -400,7 +399,6 @@ def _log_eval_wandb(results, dry):
             if k in raw: wandb.log({f"retrieval/raw/{k}": raw[k]})
             if k in dec: wandb.log({f"retrieval/decomp/{k}": dec[k]})
 
-        # Comparison tables
         if ft and bs:
             tbl = wandb.Table(columns=["metric","baseline","finetuned","delta"])
             for m in ["json_parse_rate","hop_count_acc","hop_coverage_f1","dep_graph_acc"]:
@@ -413,7 +411,6 @@ def _log_eval_wandb(results, dry):
             ret_tbl.add_data(k, round(r,4), round(d,4), round(d-r,4))
         wandb.log({"eval/retrieval_improvement": ret_tbl})
 
-        # Summary
         wandb.run.summary.update({
             "final/hop_coverage_f1": ft.get("hop_coverage_f1",0),
             "final/hop_count_acc":   ft.get("hop_count_acc",0),
@@ -429,7 +426,6 @@ def phase11(state, timer, dry):
     head("Benchmark Report", 11)
     if dry: skip("DRY RUN — skipped"); return
 
-    # Load results
     results = {}
     all_path = ROOT/"results"/"all_metrics.json"
     if all_path.exists():

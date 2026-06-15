@@ -1,35 +1,18 @@
-"""
-train/merge_and_push.py
------------------------
-Merges a LoRA/DoRA adapter into the base model and saves a standalone model.
-Optionally pushes to HuggingFace Hub.
-
-Run after each training stage:
-
-  After Stage 1:
-    python train/merge_and_push.py --stage 1
-    → outputs/stage1_merged/   (input for Stage 2)
-
-  After Stage 2:
-    python train/merge_and_push.py --stage 2
-    → outputs/stage2_merged/   (input for Stage 3)
-
-  After Stage 3:
-    python train/merge_and_push.py --stage 3 --push
-    → outputs/final/ + push to HuggingFace + GGUF
-"""
-
 import os
 import sys
 import argparse
 from pathlib import Path
-
+import torch
+from peft import PeftModel
+import subprocess
+from transformers import AutoModelForCausalLM
+from transformers import AutoTokenizer
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 STAGE_CONFIGS = {
     "1": {
-        "base_model":   None,                         # resolved from cfg.base_model_id
+        "base_model":   None,                         
         "adapter_path": "outputs/stage1_qlora/final",
         "output_path":  "outputs/stage1_merged",
         "push":         False,
@@ -62,7 +45,6 @@ def parse_args():
 
 
 def _check_internet() -> bool:
-    """Quick check — try to reach HuggingFace. Returns True if online."""
     try:
         import socket
         socket.setdefaulttimeout(3)
@@ -73,17 +55,6 @@ def _check_internet() -> bool:
 
 
 def _load_tokenizer(base_model_id: str, adapter_path: str):
-    """
-    Load tokenizer with offline fallback.
-
-    Priority:
-      1. Load from adapter_path (saved there by training — always local)
-      2. Load from base_model_id with local_files_only=True (HF cache)
-      3. Load from base_model_id with network (RunPod / online)
-    """
-    from transformers import AutoTokenizer
-
-    # 1. Tokenizer is saved in the adapter dir by every training script
     adapter_tok = Path(adapter_path) / "tokenizer.json"
     if adapter_tok.exists():
         print(f"  Loading tokenizer from adapter dir (offline-safe)...")
@@ -95,7 +66,6 @@ def _load_tokenizer(base_model_id: str, adapter_path: str):
         print(f"  ✓ Tokenizer loaded from {adapter_path}")
         return tok
 
-    # 2. Try HF cache (no network)
     try:
         print(f"  Loading tokenizer from HF cache...")
         tok = AutoTokenizer.from_pretrained(
@@ -108,7 +78,6 @@ def _load_tokenizer(base_model_id: str, adapter_path: str):
     except Exception:
         pass
 
-    # 3. Network (RunPod)
     print(f"  Downloading tokenizer from HuggingFace...")
     tok = AutoTokenizer.from_pretrained(base_model_id, trust_remote_code=True)
     print(f"  ✓ Tokenizer downloaded")
@@ -116,17 +85,7 @@ def _load_tokenizer(base_model_id: str, adapter_path: str):
 
 
 def _load_base_model(base_model_id: str):
-    """
-    Load base model with offline fallback.
-    On laptop: loads from HF cache (set when model was first downloaded).
-    On RunPod: downloads if not cached.
-    """
-    import torch
-    from transformers import AutoModelForCausalLM
-
     online = _check_internet()
-
-    # Determine dtype — CPU gets float32, GPU gets bfloat16
     is_gpu = torch.cuda.is_available()
     dtype  = torch.bfloat16 if is_gpu else torch.float32
     device = "auto" if is_gpu else "cpu"
@@ -138,14 +97,12 @@ def _load_base_model(base_model_id: str):
         trust_remote_code=True,
     )
 
-    # If base_model_id is a local path (Stage 2/3 merge), always local
     if Path(base_model_id).exists():
         print(f"  Loading base model from local path...")
         model = AutoModelForCausalLM.from_pretrained(**load_kwargs)
         print(f"  ✓ Base model loaded from disk")
         return model
 
-    # HF model ID — try cache first, then network
     if not online:
         print(f"  No internet — loading from HF cache (local_files_only)...")
         load_kwargs["local_files_only"] = True
@@ -158,9 +115,6 @@ def _load_base_model(base_model_id: str):
 
 def do_merge(base_model_id: str, adapter_path: str, output_path: str,
              push_to_hub: bool, hub_repo_id: str):
-    """Merge adapter into base model and save."""
-    import torch
-    from peft import PeftModel
 
     print(f"\n{'─'*56}")
     print(f"  Merging adapter")
@@ -198,9 +152,6 @@ def do_merge(base_model_id: str, adapter_path: str, output_path: str,
 
 
 def export_gguf(model_path: str, output_dir: str, repo_id: str):
-    """Export GGUF Q4_K_M for llama.cpp / Ollama."""
-    import subprocess
-
     llama_cpp = ROOT / "llama.cpp"
     if not llama_cpp.exists():
         print(f"  [SKIP] llama.cpp not found — GGUF export skipped")
@@ -245,7 +196,6 @@ def main():
 
     cfg = get_config("stage1")
 
-    # Resolve paths
     if args.stage:
         sc           = STAGE_CONFIGS[args.stage]
         base_model   = args.base    or sc["base_model"] or cfg.base_model_id
@@ -261,7 +211,6 @@ def main():
         output_path  = args.output
         do_push      = args.push
 
-    # Make absolute
     if not Path(base_model).is_absolute() and not base_model.startswith("Qwen"):
         base_model = str(ROOT / base_model)
     if not Path(adapter_path).is_absolute():

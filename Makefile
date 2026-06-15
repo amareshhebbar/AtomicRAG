@@ -1,15 +1,9 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# querydecomp Makefile
-# ─────────────────────────────────────────────────────────────────────────────
-#
 #   make                  → full pipeline, all data        (RunPod / production)
 #   make MAX_ROWS=30      → full pipeline, 30 rows, CPU    (laptop testing)
 #
 # Both run the EXACT same stages:
 #   data → stage1 → merge1 → stage2 → merge2 → stage3 → merge+push → eval → report
-#
-# MAX_ROWS=30 just limits data size and switches to CPU/no-W&B/no-push mode.
-#
+
 # Other targets:
 #   make setup            → venv + install only (no training)
 #   make data             → data pipeline only
@@ -32,15 +26,8 @@ ENV_EXAMPLE  := .env.example
 STATE_FILE   := outputs/.run_state.json
 PYTHON3      := python3
 
-# PYTHONPATH so `from src.xxx import` works everywhere
 export PYTHONPATH := $(shell pwd)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MAX_ROWS — the single flag that separates laptop from RunPod
-#
-#   make              → no limit, GPU, W&B on,  push to HF  (RunPod)
-#   make MAX_ROWS=30  → 30 rows, CPU, W&B off, skip HF push (laptop)
-# ─────────────────────────────────────────────────────────────────────────────
 MAX_ROWS ?=
 
 ifdef MAX_ROWS
@@ -55,24 +42,17 @@ else
     _MODE        := PRODUCTION (full data · GPU · W&B · push to HuggingFace)
 endif
 
-# ─────────────────────────────────────────────────────────────────────────────
 
 .DEFAULT_GOAL := all
 .PHONY: all setup venv install install-torch run \
         data train eval dry reset clean env help \
         _data_step _stage1 _merge1 _stage2 _merge2 _stage3 _finalize _eval _report
 
-# ─────────────────────────────────────────────────────────────────────────────
-# all — full pipeline
-# ─────────────────────────────────────────────────────────────────────────────
 all: env setup _data_step _stage1 _merge1 _stage2 _merge2 _stage3 _finalize _eval _report
 	@echo ""
 	@echo "  ✓ Full pipeline complete — $(_MODE)"
 	@echo ""
 
-# ─────────────────────────────────────────────────────────────────────────────
-# env
-# ─────────────────────────────────────────────────────────────────────────────
 env:
 	@if [ ! -f $(ENV_FILE) ]; then \
 		echo ""; \
@@ -87,9 +67,6 @@ env:
 		echo "  ✓ .env exists"; \
 	fi
 
-# ─────────────────────────────────────────────────────────────────────────────
-# venv
-# ─────────────────────────────────────────────────────────────────────────────
 venv: $(VENV)/bin/activate
 
 $(VENV)/bin/activate:
@@ -98,9 +75,6 @@ $(VENV)/bin/activate:
 	$(PYTHON3) -m venv $(VENV)
 	@echo "  ✓ venv created"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# install
-# ─────────────────────────────────────────────────────────────────────────────
 install: venv
 	@echo ""
 	@echo "  Installing from $(REQUIREMENTS)..."
@@ -108,9 +82,6 @@ install: venv
 	$(PIP) install -r $(REQUIREMENTS)
 	@echo "  ✓ Base packages installed"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# install-torch — auto-detects CUDA version
-# ─────────────────────────────────────────────────────────────────────────────
 install-torch: venv
 	@echo ""
 	@echo "  Detecting GPU and installing torch..."
@@ -130,9 +101,7 @@ install-torch: venv
 		echo "  ✓ torch installed"; \
 	)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# setup
-# ─────────────────────────────────────────────────────────────────────────────
+
 setup: env venv install install-torch
 	@echo ""
 	@echo "  ✓ Setup complete"
@@ -140,9 +109,6 @@ setup: env venv install install-torch
 	@echo "  RunPod:  make"
 	@echo ""
 
-# ─────────────────────────────────────────────────────────────────────────────
-# ── Pipeline stages (each is a separate make target so they show clearly) ────
-# ─────────────────────────────────────────────────────────────────────────────
 
 _data_step: $(VENV)/bin/activate
 	@echo ""
@@ -245,9 +211,6 @@ _report: $(VENV)/bin/activate
 	$(PYTHON) runpod/run_all.py --from_phase 11
 	@echo "  ✓ Report → results/benchmark_report.html"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Convenience targets
-# ─────────────────────────────────────────────────────────────────────────────
 
 run: $(VENV)/bin/activate
 	@echo ""

@@ -1,20 +1,14 @@
-"""
-train/stage2_dora.py
----------------------
-Stage 2: DoRA refinement on top of merged Stage 1 model.
-
-DoRA decomposes the weight update into magnitude + direction:
-  W_new = m * (W0 + BA) / ||W0 + BA||
-This gives +1-3% F1 over plain LoRA on structured output tasks.
-
-Prerequisites:
-  python train/merge_and_push.py --stage 1
-  → outputs/stage1_merged/ must exist
-
-Run:
-    python train/stage2_dora.py               # RunPod GPU
-    python train/stage2_dora.py --local_test  # Laptop CPU
-"""
+try:
+    import torch
+    import wandb
+    from transformers import TrainingArguments, Trainer
+    from src.config  import get_config, print_config
+    from src.model   import load_model_for_training, print_model_summary
+    from src.dataset import SFTDataset, get_sft_collator
+except ImportError as e:
+    print(f"[ERROR] {e}")
+    print("  Run: pip install torch transformers peft bitsandbytes trl accelerate wandb")
+    sys.exit(1)
 
 import os
 import sys
@@ -39,26 +33,12 @@ def parse_args():
 
 def main():
     args = parse_args()
-
-    # Block GPU BEFORE torch imports — the only reliable way
     if args.local_test:
         os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
-    try:
-        import torch
-        import wandb
-        from transformers import TrainingArguments, Trainer
-        from src.config  import get_config, print_config
-        from src.model   import load_model_for_training, print_model_summary
-        from src.dataset import SFTDataset, get_sft_collator
-    except ImportError as e:
-        print(f"[ERROR] {e}")
-        print("  Run: pip install torch transformers peft bitsandbytes trl accelerate wandb")
-        sys.exit(1)
 
     on_cpu = args.local_test or not torch.cuda.is_available()
 
-    # ── Build overrides dict FIRST, then apply local_test extras ─────────────
     overrides = {}
     if args.learning_rate: overrides["learning_rate"]    = args.learning_rate
     if args.max_samples:   overrides["max_train_samples"] = args.max_samples
@@ -89,7 +69,6 @@ def main():
     print_config(cfg)
     print(f"\n  Mode: {'CPU (local_test)' if on_cpu else 'GPU (RunPod)'}")
 
-    # ── Base model — Stage 1 merged, or fall back to original if not ready ───
     base_model_path = args.base_model
     if not base_model_path:
         merged = ROOT / "outputs" / "stage1_merged"
@@ -100,12 +79,10 @@ def main():
             base_model_path = cfg.base_model_id
             print(f"  Stage 1 merged not found → using base: {base_model_path}")
 
-    # ── Paths ─────────────────────────────────────────────────────────────────
     output_dir      = ROOT / cfg.output_dir
     hf_dataset_path = ROOT / cfg.hf_dataset_path
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # ── W&B ───────────────────────────────────────────────────────────────────
     if cfg.report_to == "wandb":
         wandb.init(
             project=cfg.wandb_project,
@@ -116,11 +93,9 @@ def main():
         )
         print(f"  ✓ W&B: {cfg.wandb_project}/{cfg.run_name}")
 
-    # ── Model ─────────────────────────────────────────────────────────────────
     model, tokenizer = load_model_for_training(cfg, model_id_override=base_model_path)
     print_model_summary(model)
 
-    # ── Data ──────────────────────────────────────────────────────────────────
     if not hf_dataset_path.exists():
         print(f"[ERROR] Dataset not found: {hf_dataset_path}")
         print("  Run: make data  or  make data MAX_ROWS=30")
@@ -132,7 +107,6 @@ def main():
                           "validation", cfg.max_eval_samples)
     collator = get_sft_collator(tokenizer, cfg.max_seq_length)
 
-    # ── TrainingArguments ─────────────────────────────────────────────────────
     has_eval  = len(eval_ds) > 0
     load_best = cfg.load_best_model_at_end and has_eval
     use_bf16  = cfg.bf16 and not on_cpu
@@ -170,7 +144,6 @@ def main():
         label_names                 = ["labels"],
     )
 
-    # ── Train ─────────────────────────────────────────────────────────────────
     trainer = Trainer(
         model            = model,
         args             = training_args,
@@ -187,8 +160,7 @@ def main():
     print(f"{'═'*56}\n")
 
     trainer.train()
-
-    # ── Save ──────────────────────────────────────────────────────────────────
+    
     final_dir = output_dir / "final"
     final_dir.mkdir(exist_ok=True)
     model.save_pretrained(str(final_dir))
