@@ -2,17 +2,13 @@ import os
 import sys
 import argparse
 from pathlib import Path
-import torch
-from peft import PeftModel
-import subprocess
-from transformers import AutoModelForCausalLM
-from transformers import AutoTokenizer
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 STAGE_CONFIGS = {
     "1": {
-        "base_model":   None,                         
+        "base_model":   None,
         "adapter_path": "outputs/stage1_qlora/final",
         "output_path":  "outputs/stage1_merged",
         "push":         False,
@@ -27,14 +23,14 @@ STAGE_CONFIGS = {
         "base_model":   "outputs/stage2_merged",
         "adapter_path": "outputs/stage3_orpo/final",
         "output_path":  "outputs/final",
-        "push":         True,
+        "push":         False,
     },
 }
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Merge adapter + push to HuggingFace")
-    parser.add_argument("--stage",     type=str, choices=["1","2","3"], default=None)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--stage",     type=str, choices=["1", "2", "3"], default=None)
     parser.add_argument("--base",      type=str, default=None)
     parser.add_argument("--adapter",   type=str, default=None)
     parser.add_argument("--output",    type=str, default=None)
@@ -44,7 +40,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def _check_internet() -> bool:
+def _check_internet():
     try:
         import socket
         socket.setdefaulttimeout(3)
@@ -54,68 +50,49 @@ def _check_internet() -> bool:
         return False
 
 
-def _load_tokenizer(base_model_id: str, adapter_path: str):
-    adapter_tok = Path(adapter_path) / "tokenizer.json"
-    if adapter_tok.exists():
-        print(f"  Loading tokenizer from adapter dir (offline-safe)...")
-        tok = AutoTokenizer.from_pretrained(
-            adapter_path,
-            trust_remote_code=True,
-            local_files_only=True,
-        )
-        print(f"  ✓ Tokenizer loaded from {adapter_path}")
+def _load_tokenizer(base_model_id, adapter_path):
+    from transformers import AutoTokenizer
+    if (Path(adapter_path) / "tokenizer.json").exists():
+        print(f"  Loading tokenizer from adapter dir...")
+        tok = AutoTokenizer.from_pretrained(adapter_path, trust_remote_code=True, local_files_only=True)
+        print(f"  Tokenizer loaded from {adapter_path}")
         return tok
-
     try:
         print(f"  Loading tokenizer from HF cache...")
-        tok = AutoTokenizer.from_pretrained(
-            base_model_id,
-            trust_remote_code=True,
-            local_files_only=True,
-        )
-        print(f"  ✓ Tokenizer loaded from cache")
+        tok = AutoTokenizer.from_pretrained(base_model_id, trust_remote_code=True, local_files_only=True)
+        print(f"  Tokenizer loaded from cache")
         return tok
     except Exception:
         pass
-
-    print(f"  Downloading tokenizer from HuggingFace...")
+    print(f"  Downloading tokenizer...")
     tok = AutoTokenizer.from_pretrained(base_model_id, trust_remote_code=True)
-    print(f"  ✓ Tokenizer downloaded")
+    print(f"  Tokenizer downloaded")
     return tok
 
 
-def _load_base_model(base_model_id: str):
-    online = _check_internet()
-    is_gpu = torch.cuda.is_available()
-    dtype  = torch.bfloat16 if is_gpu else torch.float32
-    device = "auto" if is_gpu else "cpu"
-
-    load_kwargs = dict(
-        pretrained_model_name_or_path=base_model_id,
-        dtype=dtype,
-        device_map=device,
-        trust_remote_code=True,
-    )
-
+def _load_base_model(base_model_id):
+    import torch
+    from transformers import AutoModelForCausalLM
+    is_gpu  = torch.cuda.is_available()
+    dtype   = torch.bfloat16 if is_gpu else torch.float32
+    device  = "auto" if is_gpu else "cpu"
+    kwargs  = dict(pretrained_model_name_or_path=base_model_id, dtype=dtype,
+                   device_map=device, trust_remote_code=True)
     if Path(base_model_id).exists():
         print(f"  Loading base model from local path...")
-        model = AutoModelForCausalLM.from_pretrained(**load_kwargs)
-        print(f"  ✓ Base model loaded from disk")
+        model = AutoModelForCausalLM.from_pretrained(**kwargs)
+        print(f"  Base model loaded from disk")
         return model
-
-    if not online:
-        print(f"  No internet — loading from HF cache (local_files_only)...")
-        load_kwargs["local_files_only"] = True
-
+    if not _check_internet():
+        print(f"  No internet — loading from HF cache...")
+        kwargs["local_files_only"] = True
     print(f"  Loading base model: {base_model_id}")
-    model = AutoModelForCausalLM.from_pretrained(**load_kwargs)
-    print(f"  ✓ Base model loaded")
+    model = AutoModelForCausalLM.from_pretrained(**kwargs)
+    print(f"  Base model loaded")
     return model
 
 
-def do_merge(base_model_id: str, adapter_path: str, output_path: str,
-             push_to_hub: bool, hub_repo_id: str):
-
+def do_merge(base_model_id, adapter_path, output_path, push_to_hub, hub_repo_id):
     print(f"\n{'─'*56}")
     print(f"  Merging adapter")
     print(f"  Base:    {base_model_id}")
@@ -126,62 +103,64 @@ def do_merge(base_model_id: str, adapter_path: str, output_path: str,
     tokenizer  = _load_tokenizer(base_model_id, adapter_path)
     base_model = _load_base_model(base_model_id)
 
-    print(f"  Loading adapter from {adapter_path}...")
+    from peft import PeftModel
+    print(f"  Loading adapter...")
     model = PeftModel.from_pretrained(base_model, adapter_path)
-
-    print(f"  Merging and unloading adapter (~1 min)...")
+    print(f"  Merging and unloading...")
     model = model.merge_and_unload()
 
-    print(f"  Saving merged model → {output_path}")
+    print(f"  Saving to {output_path}")
     Path(output_path).mkdir(parents=True, exist_ok=True)
     model.save_pretrained(output_path, safe_serialization=True)
     tokenizer.save_pretrained(output_path)
-
     total = sum(p.numel() for p in model.parameters()) / 1e9
-    print(f"  ✓ Saved — {total:.2f}B params")
+    print(f"  Saved — {total:.2f}B params")
 
     if push_to_hub and hub_repo_id:
         if not _check_internet():
-            print(f"  [WARN] No internet — skipping HF push")
-            print(f"  Push manually later: python train/merge_and_push.py --stage 3 --push")
+            print(f"  No internet — skipping HF push")
+            print(f"  Push manually: python train/merge_and_push.py --stage 3 --push")
             return
-        print(f"  Pushing to HuggingFace: {hub_repo_id}")
-        model.push_to_hub(hub_repo_id, safe_serialization=True)
-        tokenizer.push_to_hub(hub_repo_id)
-        print(f"  ✓ Live at: https://huggingface.co/{hub_repo_id}")
+        try:
+            from huggingface_hub import HfApi
+            api = HfApi()
+            print(f"  Pushing to HuggingFace: {hub_repo_id}")
+            api.create_repo(repo_id=hub_repo_id, exist_ok=True, private=False)
+            api.upload_folder(
+                folder_path=output_path,
+                repo_id=hub_repo_id,
+                repo_type="model",
+            )
+            tokenizer.push_to_hub(hub_repo_id)
+            print(f"  Live at: https://huggingface.co/{hub_repo_id}")
+        except Exception as e:
+            print(f"  [ERROR] HF push failed: {e}")
 
 
-def export_gguf(model_path: str, output_dir: str, repo_id: str):
+def export_gguf(model_path, output_dir, repo_id):
+    import subprocess
     llama_cpp = ROOT / "llama.cpp"
     if not llama_cpp.exists():
-        print(f"  [SKIP] llama.cpp not found — GGUF export skipped")
-        print(f"  To enable: git clone https://github.com/ggerganov/llama.cpp.git")
+        print(f"  [SKIP] llama.cpp not found")
         return
-
     gguf_name = f"{repo_id.split('/')[-1]}-Q4_K_M.gguf"
     gguf_path = Path(output_dir) / gguf_name
-
-    print(f"\n  Exporting GGUF → {gguf_path}")
+    print(f"  Exporting GGUF → {gguf_path}")
     r = subprocess.run(
-        ["python", str(llama_cpp/"convert_hf_to_gguf.py"),
+        ["python", str(llama_cpp / "convert_hf_to_gguf.py"),
          model_path, "--outfile", str(gguf_path), "--outtype", "q4_k_m"],
         capture_output=True, text=True
     )
     if r.returncode != 0:
-        print(f"  [ERROR] GGUF export failed:\n{r.stderr}")
+        print(f"  [ERROR] GGUF failed: {r.stderr}")
         return
-
-    print(f"  ✓ GGUF saved ({gguf_path.stat().st_size/1e9:.2f} GB)")
-
+    print(f"  GGUF saved ({gguf_path.stat().st_size/1e9:.2f} GB)")
     if repo_id and _check_internet():
         try:
             from huggingface_hub import HfApi
-            HfApi().upload_file(
-                path_or_fileobj=str(gguf_path),
-                path_in_repo=gguf_name,
-                repo_id=repo_id,
-            )
-            print(f"  ✓ GGUF pushed to hub")
+            HfApi().upload_file(path_or_fileobj=str(gguf_path),
+                                path_in_repo=gguf_name, repo_id=repo_id)
+            print(f"  GGUF pushed to hub")
         except Exception as e:
             print(f"  [WARN] GGUF upload failed: {e}")
 
@@ -192,7 +171,8 @@ def main():
     try:
         from src.config import get_config
     except ImportError as e:
-        print(f"[ERROR] {e}"); sys.exit(1)
+        print(f"[ERROR] {e}")
+        sys.exit(1)
 
     cfg = get_config("stage1")
 
@@ -201,7 +181,7 @@ def main():
         base_model   = args.base    or sc["base_model"] or cfg.base_model_id
         adapter_path = args.adapter or sc["adapter_path"]
         output_path  = args.output  or sc["output_path"]
-        do_push      = args.push    or sc["push"]
+        do_push      = args.push
     else:
         if not all([args.base, args.adapter, args.output]):
             print("[ERROR] Provide --stage OR all of --base, --adapter, --output")
@@ -231,7 +211,6 @@ def main():
 
     if not Path(adapter_path).exists():
         print(f"[ERROR] Adapter not found: {adapter_path}")
-        print(f"  Did the training script finish successfully?")
         sys.exit(1)
 
     do_merge(
@@ -245,15 +224,12 @@ def main():
     if args.push_gguf and args.stage == "3":
         export_gguf(output_path, output_path, repo_id)
 
-    next_steps = {
-        "1": "python train/stage2_dora.py",
-        "2": "python train/stage3_orpo.py",
-        "3": "python eval/evaluate_decomposition.py",
-    }
+    next_steps = {"1": "train/stage2_dora.py", "2": "train/stage3_orpo.py",
+                  "3": "eval/evaluate_decomposition.py"}
     if args.stage and args.stage in next_steps:
-        print(f"\n  Next: {next_steps[args.stage]}")
+        print(f"\n  Next: python {next_steps[args.stage]}")
 
-    print(f"\n✓ Done.\n")
+    print(f"\nDone.\n")
 
 
 if __name__ == "__main__":
