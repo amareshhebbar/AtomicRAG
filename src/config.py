@@ -87,16 +87,18 @@ class Stage1Config(BaseConfig):
     lora_alpha:                  int   = 32
     use_dora:                    bool  = False
     num_train_epochs:            int   = 3
-    per_device_train_batch_size: int   = 4
-    gradient_accumulation_steps: int   = 4
+    per_device_train_batch_size: int   = 8
+    per_device_eval_batch_size:  int   = 8
+    gradient_accumulation_steps: int   = 2
     learning_rate:               float = 2e-4
+    max_seq_length:              int   = 1024
     optim:                       str   = "paged_adamw_32bit"
     gradient_checkpointing:      bool  = True
     bf16:                        bool  = True
     dataloader_num_workers:      int   = 4
     logging_steps:               int   = 10
-    eval_steps:                  int   = 100
-    save_steps:                  int   = 100
+    eval_steps:                  int   = 200
+    save_steps:                  int   = 200
     save_total_limit:            int   = 3
 
 
@@ -111,16 +113,18 @@ class Stage2Config(BaseConfig):
     lora_alpha:                  int   = 16
     use_dora:                    bool  = True
     num_train_epochs:            int   = 1
-    per_device_train_batch_size: int   = 4
-    gradient_accumulation_steps: int   = 4
+    per_device_train_batch_size: int   = 8
+    per_device_eval_batch_size:  int   = 8
+    gradient_accumulation_steps: int   = 2
     learning_rate:               float = 5e-5
+    max_seq_length:              int   = 1024
     optim:                       str   = "paged_adamw_32bit"
     gradient_checkpointing:      bool  = True
     bf16:                        bool  = True
     dataloader_num_workers:      int   = 4
     logging_steps:               int   = 10
-    eval_steps:                  int   = 50
-    save_steps:                  int   = 50
+    eval_steps:                  int   = 100
+    save_steps:                  int   = 100
     save_total_limit:            int   = 2
 
 
@@ -137,16 +141,17 @@ class Stage3Config(BaseConfig):
     orpo_beta:                   float = 0.1
     max_seq_length:              int   = 2048
     num_train_epochs:            int   = 1
-    per_device_train_batch_size: int   = 2
-    gradient_accumulation_steps: int   = 8
+    per_device_train_batch_size: int   = 4
+    per_device_eval_batch_size:  int   = 4
+    gradient_accumulation_steps: int   = 4
     learning_rate:               float = 5e-6
     optim:                       str   = "paged_adamw_32bit"
     gradient_checkpointing:      bool  = True
     bf16:                        bool  = True
     dataloader_num_workers:      int   = 4
     logging_steps:               int   = 5
-    eval_steps:                  int   = 50
-    save_steps:                  int   = 50
+    eval_steps:                  int   = 100
+    save_steps:                  int   = 100
     save_total_limit:            int   = 2
 
 
@@ -214,7 +219,7 @@ if __name__ == "__main__":
         cfg = get_config(stage)
         print(f"✓ {stage:12s}  lr={cfg.learning_rate}  epochs={cfg.num_train_epochs}  "
               f"r={cfg.lora_r}  dora={cfg.use_dora}  4bit={cfg.use_4bit}  "
-              f"workers={cfg.dataloader_num_workers}")
+              f"batch={cfg.per_device_train_batch_size}  seq={cfg.max_seq_length}")
     cfg = get_config("stage1", lora_r=32, learning_rate=1e-4)
     assert cfg.lora_r == 32
     assert cfg.learning_rate == 1e-4

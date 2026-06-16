@@ -1,165 +1,157 @@
 # AtomicRAG
 
-Fine-tuned Qwen2.5-1.5B that breaks complex questions into atomic sub-queries before RAG retrieval.
-
-**The problem it solves:**
-
-> *"What changed in the refund policy after the 2023 restructuring that affects enterprise customers?"*
-
-A naive RAG system embeds this entire question and retrieves nothing useful. The answer lives across 3 separate documents. This model decomposes it into retrievable sub-queries with a dependency graph — so a retriever knows which hops to run in parallel and which need the previous answer first.
-
-**Result:** hit@3 improves from **31% → 67%** on multi-hop questions. Inference: **~50ms**. Total training cost: **$2.64**.
+Fine-tuned Qwen2.5-1.5B that breaks complex multi-hop questions into atomic sub-queries for RAG retrieval.
 
 ---
 
-## Output format
+## The problem
 
-Not a flat list. A dependency graph:
+When you ask a RAG system *"What changed in the refund policy after the 2023 restructuring that affects enterprise customers?"* — it embeds the entire question and retrieves garbage. The answer lives across 3 separate documents.
+
+AtomicRAG breaks it into:
 
 ```json
 [
-  {"hop": 1, "sub_query": "What year did the 2023 restructuring happen?",           "depends_on": []},
-  {"hop": 2, "sub_query": "What was the refund policy version released after 2023?", "depends_on": [1]},
-  {"hop": 3, "sub_query": "Which tier of that policy applies to enterprise customers?","depends_on": [2]}
+  {"hop": 1, "sub_query": "When did the 2023 restructuring happen?",                "depends_on": []},
+  {"hop": 2, "sub_query": "What refund policy was released after the restructuring?","depends_on": [1]},
+  {"hop": 3, "sub_query": "Which tier of that policy applies to enterprise?",        "depends_on": [2]}
 ]
 ```
 
-`depends_on: []` = parallel retrieval safe. `depends_on: [1]` = wait for hop 1 answer first.
+`depends_on: []` means retrieve in parallel. `depends_on: [1]` means wait for hop 1 first.
 
-This is what no other decomposition model outputs at sub-7B scale.
+**Result: hit@3 goes from 31% to 67% on multi-hop questions.**
 
 ---
 
-## Use it
+## Quick inference
 
 ```python
 from transformers import pipeline
 
 pipe = pipeline("text-generation", model="AmareshHebbar/querydecomp-qwen2.5-1.5b")
-out  = pipe("Who directed Inception and where were they born?", max_new_tokens=200)
+out  = pipe("Who directed Inception and where were they born?", max_new_tokens=200, do_sample=False)
 print(out[0]["generated_text"])
 ```
 
-Via Ollama (GGUF):
+Via Ollama:
 ```bash
 ollama run hf.co/AmareshHebbar/querydecomp-qwen2.5-1.5b
 ```
 
 ---
 
-## Training — 3-stage curriculum
+## Run it yourself
 
-| Stage | Method | Why | Time | Cost |
-|---|---|---|---|---|
-| 1 | QLoRA SFT (r=16, NF4 4-bit) | Learn the structure of decomposition | ~5h | $1.10 |
-| 2 | DoRA refinement (r=8, bf16) | Calibrate magnitude vs direction separately | ~2.5h | $0.55 |
-| 3 | ORPO alignment | Learn what bad decompositions look like | ~3.5h | $0.77 |
-| — | Merge + push | Final bf16 model + GGUF to HF Hub | ~30m | $0.22 |
+### Laptop — test with 30 rows (CPU, ~30 min, no cost)
 
-**Total: ~$2.64 on RTX A5000 spot.**
+```bash
+git clone https://github.com/AmareshHebbar/AtomicRAG
+cd AtomicRAG
+cp .env.example .env
+nano .env          # fill HF_TOKEN and WANDB_API_KEY
+make MAX_ROWS=30
+```
 
-Stage 3 ORPO trains the model to reject 5 specific failure modes:
+Runs the full pipeline on 30 rows per dataset. CPU only, no GPU, no push to HuggingFace. Use this to verify everything works before spending money on a pod.
 
-| Rejection type | Example |
+### RunPod — full training (GPU, ~12h, pushes to HuggingFace)
+
+```bash
+git clone https://github.com/AmareshHebbar/AtomicRAG
+cd AtomicRAG
+cp .env.example .env
+nano .env          # fill HF_TOKEN, WANDB_API_KEY, WANDB_ENTITY
+make
+```
+
+One command. Does everything.
+
+---
+
+## What make actually does
+
+Both `make MAX_ROWS=30` and `make` run the same 8 stages. Only the data size and hardware change.
+
+```
+[1/8] Data        download datasets, process, build splits, build ORPO pairs
+[2/8] Stage 1     QLoRA SFT — model learns the decomposition format
+[3/8] Merge 1     merge adapter into base model
+[4/8] Stage 2     DoRA refinement — improves decomposition precision
+[5/8] Merge 2     merge adapter into base model
+[6/8] Stage 3     ORPO alignment — model learns what bad decompositions look like
+[7/8] Merge 3     final merge (RunPod also pushes to HuggingFace)
+[8/8] Eval        F1, hit@k, speed benchmark, HTML report
+```
+
+| | `make MAX_ROWS=30` | `make` |
+|---|---|---|
+| Hardware | CPU | RTX A5000 GPU |
+| Data size | 30 rows per dataset | All rows (~300K) |
+| W&B logging | Off | On |
+| HuggingFace push | Off | On |
+| Time | ~30 min | ~12 hours |
+| Cost | $0 | ~$2.64 |
+
+---
+
+## Other make commands
+
+```bash
+make setup             # create venv and install packages only
+make data              # data pipeline only
+make data MAX_ROWS=30  # data pipeline, 30 rows
+make train             # all 3 training stages, skip data
+make eval              # evaluation and report only
+make reset             # wipe run state so everything re-runs next time
+make clean             # delete venv and all outputs
+make dry               # print every command without running anything
+make help              # show all targets
+```
+
+If a RunPod pod crashes mid-run, just run `make` again. It reads `outputs/.run_state.json` and skips stages that already finished.
+
+---
+
+## Training — 3 stages explained
+
+**Stage 1 — QLoRA SFT**
+
+Trains the model to produce valid dependency graph JSON. Uses NF4 4-bit quantization so the model fits in GPU memory. 3 epochs, LoRA rank 16.
+
+**Stage 2 — DoRA refinement**
+
+DoRA decomposes each weight update into a magnitude component and a direction component and trains them separately. This gives better structured output than plain LoRA, especially on the `depends_on` field. 1 epoch on the Stage 1 merged model.
+
+**Stage 3 — ORPO alignment**
+
+Trains on (chosen, rejected) pairs without needing a separate reference model. The model learns to reject 5 specific failure modes:
+
+| Rejection type | What it means |
 |---|---|
-| `merged_hops` | "Who directed Inception and where were they born?" as ONE sub-query |
-| `hallucinated` | Replacing "Christopher Nolan" with "Alan Voss" in the sub-query |
-| `zero_decomp` | Returning the original question unchanged |
-| `over_decomp` | Splitting a 2-hop into 6 trivial sub-questions |
-| `missing_hop` | Dropping the bridge query from a 3-hop chain |
+| `merged_hops` | Two hops combined into one bloated sub-query |
+| `hallucinated` | The entity in the sub-query is made up |
+| `zero_decomp` | The original question returned unchanged |
+| `over_decomp` | A 2-hop question split into 6 pointless sub-questions |
+| `missing_hop` | The bridge hop dropped from a 3-hop chain |
 
 ---
 
 ## Data
 
-| Dataset | Size | What it provides |
+| Dataset | Rows | What it provides |
 |---|---|---|
-| MuSiQue | 44.7K | Gold standard — explicit per-hop sub-questions with answers |
-| HotpotQA | 113K | 2-hop bridge + comparison questions |
-| 2WikiMultiHopQA | 167K | 4 reasoning types: bridge, comparison, compositional, inference |
-| Synthetic (Ollama) | ~12K | Domain expansion: legal, financial, medical |
+| bdsaglam/musique | 44.7K | Gold sub-questions with explicit hop labels |
+| hotpotqa/hotpot_qa | 113K | 2-hop bridge and comparison questions |
+| framolfese/2WikiMultihopQA | 167K | Bridge, comparison, compositional, inference types |
 
-After filtering and dedup: **~42K SFT examples** + **~71K ORPO pairs**.
-
----
-
-## Run the full pipeline yourself
-
-On a fresh RunPod A5000 pod, with `HF_TOKEN` and `WANDB_API_KEY` set:
-
-```bash
-git clone https://github.com/AmareshHebbar/AtomicRAG
-cd AtomicRAG
-python runpod/run_all.py
-```
-
-That's it. One command. It handles:
-- GPU check + auth
-- pip installs
-- Dataset download + processing + dedup
-- All 3 training stages with merge between each
-- Push to HuggingFace + GGUF export
-- Evaluation
-
-If the pod crashes mid-run, rerun the same command — it reads state from `outputs/.run_state.json` and resumes from where it left off.
-
-```bash
-# Jump to a specific phase
-python runpod/run_all.py --from_phase 6    # start from Stage 2
-
-# Data only
-python runpod/run_all.py --only_data
-
-# See what would run without doing anything
-python runpod/run_all.py --dry_run
-```
+After filtering and dedup: ~42K SFT training examples and ~71K ORPO pairs.
 
 ---
 
-## File structure
+## Results
 
-```
-AtomicRAG/
-│
-├── scripts/
-│   ├── download_data.py        downloads MuSiQue + HotpotQA + 2Wiki from HF
-│   ├── process_musique.py      gold decompositions → dependency graph JSONL
-│   ├── process_hotpot.py       heuristic decompositions from supporting facts
-│   ├── process_2wiki.py        4 reasoning types → unified format
-│   ├── build_splits.py         merge + filter + dedup + HF DatasetDict
-│   ├── build_orpo_pairs.py     5 rejection types per example → ORPO pairs
-│   └── stats.py                dataset statistics and verification
-│
-├── src/
-│   ├── config.py               all hyperparams in one dataclass per stage
-│   ├── model.py                model loading (4-bit/bf16), LoRA/DoRA, merge
-│   ├── dataset.py              SFTDataset + ORPODataset (label masking built in)
-│   └── utils.py                prompt builder, JSON parser, dep graph validator
-│
-├── train/
-│   ├── stage1_qlora.py         QLoRA SFT with W&B logging + sample callbacks
-│   ├── stage2_dora.py          DoRA refinement on merged Stage 1 model
-│   ├── stage3_orpo.py          ORPO alignment using TRL ORPOTrainer
-│   └── merge_and_push.py       merge adapter → bf16 → HF Hub + GGUF
-│
-├── eval/
-│   ├── evaluate_decomposition.py   sub-query F1, hop coverage, dep graph accuracy
-│   ├── evaluate_retrieval.py       hit@k before vs after decomposition
-│   └── benchmark_speed.py          p50/p95 latency vs GPT-4o reference
-│
-├── configs/
-│   ├── local_test.yaml         CPU-safe tiny run (20 examples, no GPU)
-│   └── runpod_a5000.yaml       full A5000 config with VRAM breakdown
-│
-└── runpod/
-    ├── run_all.py              master orchestrator — runs entire pipeline
-    ├── setup.sh                one-shot pod setup
-    └── train_stage*.sh         individual stage launchers
-```
-
----
-
-## Eval results
+**Decomposition quality on MuSiQue validation:**
 
 | Metric | Base model | Fine-tuned | Delta |
 |---|---|---|---|
@@ -168,39 +160,77 @@ AtomicRAG/
 | Hop coverage F1 | 0.38 | 0.79 | +0.41 |
 | Dep graph accuracy | 21% | 71% | +50% |
 
-Retrieval (BM25, MuSiQue validation):
+**Retrieval improvement with BM25 on MuSiQue validation:**
 
-| | Raw question | Decomposed | Delta |
+| | Raw question | With decomposition | Delta |
 |---|---|---|---|
 | hit@1 | 18% | 41% | +23% |
 | hit@3 | 31% | 67% | +36% |
 | hit@5 | 39% | 78% | +39% |
 
-Speed vs GPT-4o:
+**Speed vs GPT-4o:**
 
-| | p50 | p95 | $/1k queries |
+| | p50 | p95 | cost per 1k queries |
 |---|---|---|---|
 | GPT-4o (API, prompted) | 1800ms | 3200ms | $30.00 |
-| AtomicRAG (A5000) | ~50ms | ~90ms | $0.02 |
+| AtomicRAG on A5000 | ~50ms | ~90ms | $0.02 |
 
 ---
 
-## Why fine-tuning, not prompting
+## Environment variables
 
-GPT-4o with a good system prompt gets ~61% hop coverage F1 on MuSiQue. This model gets 79%. The gap exists because:
+Copy `.env.example` to `.env` and fill these in:
 
-1. Decomposition quality is domain-specific. Legal hops differ from financial hops differ from medical hops. The model learns these patterns at the weight level.
-2. The `depends_on` structure (parallel vs sequential) requires understanding causality between sub-queries — something prompting can't reliably produce at inference time.
-3. At 50ms vs 2000ms, this is viable inside a real RAG pipeline. GPT-4o is not.
+```
+HF_TOKEN          HuggingFace token with read and write access
+WANDB_API_KEY     W&B API key
+WANDB_ENTITY      your W&B username
+WANDB_PROJECT     project name (default: querydecomp)
+HF_REPO_ID        where to push the model (default: AmareshHebbar/querydecomp-qwen2.5-1.5b)
+```
 
----
-
-## Connects to
-
-- **recall** — my RAG retrieval engine. AtomicRAG sits in front of it as the query layer.
-- **ShiftLeft** — autonomous bug-fixing agent. AtomicRAG is the triage layer that decomposes a bug report before the fix agent starts.
-- **hard-coat** — hallucination interceptor. The `rejected` training examples in Stage 3 directly use hard-coat's semantic similarity detection to flag hallucinated entities.
+On RunPod you can set these in pod Settings > Environment Variables instead of the .env file.
 
 ---
 
-*Amaresh Hebbar · [GitHub](https://github.com/AmareshHebbar) · [HuggingFace](https://huggingface.co/AmareshHebbar) · [W&B](https://wandb.ai/amareshhebbar)*
+## File structure
+
+```
+AtomicRAG/
+├── Makefile                    run everything: make / make MAX_ROWS=30
+├── requirements.txt            pip dependencies
+├── .env.example                copy this to .env and fill in your tokens
+│
+├── scripts/
+│   ├── download_data.py        download 3 datasets from HuggingFace
+│   ├── process_musique.py      gold decompositions to JSONL
+│   ├── process_hotpot.py       supporting facts to heuristic decompositions
+│   ├── process_2wiki.py        4 reasoning types to unified format
+│   ├── build_splits.py         merge, filter, dedup, save as HF DatasetDict
+│   ├── build_orpo_pairs.py     5 rejection types per example
+│   └── stats.py                dataset verification and statistics
+│
+├── src/
+│   ├── config.py               all hyperparams in one dataclass per stage
+│   ├── model.py                load model, apply LoRA/DoRA, merge adapters
+│   ├── dataset.py              SFTDataset and ORPODataset with label masking
+│   └── utils.py                prompt builder, JSON parser, dep graph validator
+│
+├── train/
+│   ├── stage1_qlora.py         QLoRA SFT
+│   ├── stage2_dora.py          DoRA refinement
+│   ├── stage3_orpo.py          ORPO alignment (custom loss, no TRL dependency)
+│   └── merge_and_push.py       merge adapter into bf16, push to HF Hub
+│
+├── eval/
+│   ├── evaluate_decomposition.py   hop F1 and dep graph accuracy
+│   ├── evaluate_retrieval.py       hit@k before and after decomposition
+│   └── benchmark_speed.py          latency and cost vs GPT-4o
+│
+└── runpod/
+    └── run_all.py              orchestrator used for benchmark report generation
+```
+
+---
+
+*Amaresh Hebbar · [HuggingFace](https://huggingface.co/AmareshHebbar) · [W&B](https://wandb.ai/amareshhebbar)*
