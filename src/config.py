@@ -16,7 +16,7 @@ class BaseConfig:
     output_dir:str= "outputs"
     max_seq_length: int= 1024
     padding_side:str= "right"
-    use_4bit:  bool= True
+    use_4bit:  bool= False
     bnb_4bit_compute_dtype: str= "bfloat16"
     bnb_4bit_quant_type: str= "nf4"
     bnb_double_quant: bool= True
@@ -82,7 +82,7 @@ class Stage1Config(BaseConfig):
     stage:str= "stage1_qlora"
     output_dir:str= "outputs/stage1_qlora"
     run_name:  str= "stage1-qlora-r16"
-    use_4bit:  bool= True
+    use_4bit:  bool= False
     lora_r: int= 16
     lora_alpha:int= 32
     use_dora:  bool= False
