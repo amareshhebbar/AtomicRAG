@@ -14,19 +14,19 @@ except ImportError:
     print("[ERROR] Run: pip install datasets tqdm")
     sys.exit(1)
 
-ROOT      = Path(__file__).resolve().parent.parent
-PROC_DIR  = ROOT / "data" / "processed"
-SYN_DIR   = ROOT / "data" / "synthetic"
+ROOT = Path(__file__).resolve().parent.parent
+PROC_DIR= ROOT / "data" / "processed"
+SYN_DIR= ROOT / "data" / "synthetic"
 
 SOURCE_FILES = {
-    "musique":         [PROC_DIR / "musique_train.jsonl",
+    "musique": [PROC_DIR / "musique_train.jsonl",
                         PROC_DIR / "musique_val.jsonl"],
-    "hotpotqa":        [PROC_DIR / "hotpotqa_train.jsonl",
+    "hotpotqa":[PROC_DIR / "hotpotqa_train.jsonl",
                         PROC_DIR / "hotpotqa_val.jsonl"],
     "2wikimultihopqa": [PROC_DIR / "2wiki_train.jsonl",
                         PROC_DIR / "2wiki_validation.jsonl",
                         PROC_DIR / "2wiki_test.jsonl"],
-    "synthetic":       list(SYN_DIR.glob("*.jsonl")) if SYN_DIR.exists() else [],
+    "synthetic":  list(SYN_DIR.glob("*.jsonl")) if SYN_DIR.exists() else [],
 }
 
 RANDOM_SEED = 42
@@ -51,7 +51,7 @@ def parse_assistant_json(example: dict) -> Optional[list[dict]]:
 
 def check_sub_query_lengths(dep_graph: list[dict]) -> bool:
     for hop in dep_graph:
-        q     = hop.get("sub_query", "")
+        q= hop.get("sub_query", "")
         words = len(q.split())
         if words < 3 or words > 80:
             return False
@@ -63,10 +63,10 @@ def check_min_hops(dep_graph: list[dict]) -> bool:
 
 
 def check_token_overlap(question: str, dep_graph: list[dict]) -> bool:
-    q_tokens   = set(w.lower() for w in question.split() if len(w) > 3)
-    all_text   = " ".join(h.get("sub_query", "") for h in dep_graph).lower()
-    sq_tokens  = set(all_text.split())
-    overlap    = q_tokens & sq_tokens
+    q_tokens= set(w.lower() for w in question.split() if len(w) > 3)
+    all_text= " ".join(h.get("sub_query", "") for h in dep_graph).lower()
+    sq_tokens= set(all_text.split())
+    overlap = q_tokens & sq_tokens
     return len(overlap) >= 1
 
 
@@ -157,8 +157,8 @@ def load_all_sources(sources: Optional[list[str]]) -> list[dict]:
 
 def filter_and_dedup(examples: list[dict]) -> tuple[list[dict], dict]:
     skip_reasons = defaultdict(int)
-    seen_hashes  = set()
-    clean        = []
+    seen_hashes= set()
+    clean= []
 
     for ex in tqdm(examples, desc="  Filtering + deduplicating"):
         ok, reason = passes_quality_filter(ex)
@@ -177,8 +177,8 @@ def filter_and_dedup(examples: list[dict]) -> tuple[list[dict], dict]:
     stats = {
         "total_input":  len(examples),
         "total_output": len(clean),
-        "skipped":      dict(skip_reasons),
-        "kept_pct":     round(len(clean) / max(len(examples), 1) * 100, 1),
+        "skipped": dict(skip_reasons),
+        "kept_pct":round(len(clean) / max(len(examples), 1) * 100, 1),
     }
     return clean, stats
 
@@ -192,14 +192,14 @@ def split_examples(
     rng = random.Random(seed)
     rng.shuffle(examples)
 
-    n         = len(examples)
-    n_test    = int(n * test_ratio)
-    n_val     = int(n * val_ratio)
-    n_train   = n - n_val - n_test
+    n = len(examples)
+    n_test = int(n * test_ratio)
+    n_val= int(n * val_ratio)
+    n_train= n - n_val - n_test
 
     train = examples[:n_train]
-    val   = examples[n_train : n_train + n_val]
-    test  = examples[n_train + n_val :]
+    val= examples[n_train : n_train + n_val]
+    test= examples[n_train + n_val :]
 
     return train, val, test
 
@@ -223,14 +223,14 @@ def build_hf_dataset(train: list[dict], val: list[dict], test: list[dict]) -> Da
 
     def make_ds(examples: list[dict]) -> Dataset:
         rows = {
-            "id":                   [],
-            "domain":               [],
-            "source":               [],
-            "hop_count":            [],
-            "complexity":           [],
-            "messages":             [],
+            "id": [],
+            "domain":  [],
+            "source":  [],
+            "hop_count": [],
+            "complexity":[],
+            "messages":[],
             "ground_truth_answer":  [],
-            "quality_tier":         [],
+            "quality_tier": [],
         }
         for ex in examples:
             rows["id"].append(ex.get("id", ""))
@@ -268,17 +268,17 @@ def print_split_stats(train, val, test):
     print(f"  FINAL SPLIT STATISTICS")
     print(f"{'─' * 60}")
     for name, split in [("train", train), ("val", val), ("test", test)]:
-        hops     = defaultdict(int)
-        sources  = defaultdict(int)
-        domains  = defaultdict(int)
+        hops= defaultdict(int)
+        sources= defaultdict(int)
+        domains= defaultdict(int)
         for ex in split:
             hops[ex.get("hop_count", "?")]    += 1
             sources[ex.get("source", "?")]    += 1
             domains[ex.get("domain", "?")]    += 1
         print(f"\n  {name.upper()} ({len(split):,} examples)")
         print(f"    Hop counts: {dict(sorted(hops.items()))}")
-        print(f"    Sources:    {dict(sources)}")
-        print(f"    Domains:    {dict(domains)}")
+        print(f"    Sources: {dict(sources)}")
+        print(f"    Domains: {dict(domains)}")
 
 
 def main():
@@ -301,10 +301,10 @@ def main():
 
     print(f"\n{'═' * 60}")
     print(f"  QueryDecomp — Build Final SFT Splits")
-    print(f"  Sources:    {sources or 'all'}")
+    print(f"  Sources: {sources or 'all'}")
     print(f"  Val ratio:  {args.val_ratio}")
     print(f"  Test ratio: {args.test_ratio}")
-    print(f"  Seed:       {args.seed}")
+    print(f"  Seed:  {args.seed}")
     print(f"{'═' * 60}")
 
     PROC_DIR.mkdir(parents=True, exist_ok=True)
@@ -325,8 +325,8 @@ def main():
     clean, stats = filter_and_dedup(all_examples)
 
     print(f"\n  Filter results:")
-    print(f"    Input:    {stats['total_input']:,}")
-    print(f"    Output:   {stats['total_output']:,}  ({stats['kept_pct']}% kept)")
+    print(f"    Input: {stats['total_input']:,}")
+    print(f"    Output:{stats['total_output']:,}  ({stats['kept_pct']}% kept)")
     print(f"    Skipped:  {stats['skipped']}")
 
     print(f"\n  Splitting into train/val/test...")

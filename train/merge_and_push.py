@@ -8,22 +8,22 @@ sys.path.insert(0, str(ROOT))
 
 STAGE_CONFIGS = {
     "1": {
-        "base_model":   None,
+        "base_model":None,
         "adapter_path": "outputs/stage1_qlora/final",
         "output_path":  "outputs/stage1_merged",
-        "push":         False,
+        "push": False,
     },
     "2": {
-        "base_model":   "outputs/stage1_merged",
+        "base_model":"outputs/stage1_merged",
         "adapter_path": "outputs/stage2_dora/final",
         "output_path":  "outputs/stage2_merged",
-        "push":         False,
+        "push": False,
     },
     "3": {
-        "base_model":   "outputs/stage2_merged",
+        "base_model":"outputs/stage2_merged",
         "adapter_path": "outputs/stage3_orpo/final",
         "output_path":  "outputs/final",
-        "push":         False,
+        "push": False,
     },
 }
 
@@ -73,10 +73,10 @@ def _load_tokenizer(base_model_id, adapter_path):
 def _load_base_model(base_model_id):
     import torch
     from transformers import AutoModelForCausalLM
-    is_gpu  = torch.cuda.is_available()
-    dtype   = torch.bfloat16 if is_gpu else torch.float32
-    device  = "auto" if is_gpu else "cpu"
-    kwargs  = dict(pretrained_model_name_or_path=base_model_id, dtype=dtype,
+    is_gpu= torch.cuda.is_available()
+    dtype= torch.bfloat16 if is_gpu else torch.float32
+    device= "auto" if is_gpu else "cpu"
+    kwargs= dict(pretrained_model_name_or_path=base_model_id, dtype=dtype,
                    device_map=device, trust_remote_code=True)
     if Path(base_model_id).exists():
         print(f"  Loading base model from local path...")
@@ -95,12 +95,12 @@ def _load_base_model(base_model_id):
 def do_merge(base_model_id, adapter_path, output_path, push_to_hub, hub_repo_id):
     print(f"\n{'─'*56}")
     print(f"  Merging adapter")
-    print(f"  Base:    {base_model_id}")
+    print(f"  Base: {base_model_id}")
     print(f"  Adapter: {adapter_path}")
     print(f"  Output:  {output_path}")
     print(f"{'─'*56}")
 
-    tokenizer  = _load_tokenizer(base_model_id, adapter_path)
+    tokenizer= _load_tokenizer(base_model_id, adapter_path)
     base_model = _load_base_model(base_model_id)
 
     from peft import PeftModel
@@ -177,19 +177,19 @@ def main():
     cfg = get_config("stage1")
 
     if args.stage:
-        sc           = STAGE_CONFIGS[args.stage]
-        base_model   = args.base    or sc["base_model"] or cfg.base_model_id
+        sc=STAGE_CONFIGS[args.stage]
+        base_model= args.base    or sc["base_model"] or cfg.base_model_id
         adapter_path = args.adapter or sc["adapter_path"]
-        output_path  = args.output  or sc["output_path"]
-        do_push      = args.push
+        output_path= args.output  or sc["output_path"]
+        do_push = args.push
     else:
         if not all([args.base, args.adapter, args.output]):
             print("[ERROR] Provide --stage OR all of --base, --adapter, --output")
             sys.exit(1)
-        base_model   = args.base
+        base_model= args.base
         adapter_path = args.adapter
-        output_path  = args.output
-        do_push      = args.push
+        output_path= args.output
+        do_push = args.push
 
     if not Path(base_model).is_absolute() and not base_model.startswith("Qwen"):
         base_model = str(ROOT / base_model)
@@ -202,10 +202,10 @@ def main():
 
     print(f"\n{'═'*56}")
     print(f"  Merge & Push — Stage {args.stage or 'custom'}")
-    print(f"  Base:    {base_model}")
+    print(f"  Base: {base_model}")
     print(f"  Adapter: {adapter_path}")
     print(f"  Output:  {output_path}")
-    print(f"  Push:    {do_push}  Repo: {repo_id if do_push else 'N/A'}")
+    print(f"  Push: {do_push}  Repo: {repo_id if do_push else 'N/A'}")
     print(f"  Online:  {_check_internet()}")
     print(f"{'═'*56}\n")
 

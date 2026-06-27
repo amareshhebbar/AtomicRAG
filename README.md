@@ -30,7 +30,7 @@ AtomicRAG breaks it into:
 from transformers import pipeline
 
 pipe = pipeline("text-generation", model="AmareshHebbar/querydecomp-qwen2.5-1.5b")
-out  = pipe("Who directed Inception and where were they born?", max_new_tokens=200, do_sample=False)
+out= pipe("Who directed Inception and where were they born?", max_new_tokens=200, do_sample=False)
 print(out[0]["generated_text"])
 ```
 

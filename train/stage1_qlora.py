@@ -45,19 +45,19 @@ def main():
     stage = "local_test" if args.local_test else "stage1"
 
     overrides = {}
-    if args.lora_r:        
+    if args.lora_r:
         overrides["lora_r"] = args.lora_r
-    if args.lora_alpha:    
+    if args.lora_alpha: 
         overrides["lora_alpha"] = args.lora_alpha
     if args.learning_rate: 
         overrides["learning_rate"]= args.learning_rate
-    if args.num_epochs:    
+    if args.num_epochs: 
         overrides["num_train_epochs"] = args.num_epochs
-    if args.batch_size:    
+    if args.batch_size: 
         overrides["per_device_train_batch_size"] = args.batch_size
-    if args.max_samples:   
+    if args.max_samples:
         overrides["max_train_samples"]= args.max_samples
-    if args.no_wandb:      
+    if args.no_wandb: 
         overrides["report_to"] = "none"
 
     cfg = get_config(stage, **overrides)
@@ -66,7 +66,7 @@ def main():
     print(f"\n  Mode: {'CPU (local_test)' if on_cpu else 'GPU (RunPod)'}")
     print(f"  torch.cuda.is_available() = {torch.cuda.is_available()}")
 
-    output_dir      = ROOT / cfg.output_dir
+    output_dir = ROOT / cfg.output_dir
     hf_dataset_path = ROOT / cfg.hf_dataset_path
     output_dir.mkdir(parents=True, exist_ok=True)
     cfg.save(str(output_dir / "config.json"))
@@ -114,42 +114,42 @@ def main():
         if on_cpu:
             print(decode_batch_sample(batch, tokenizer, 0))
 
-    has_eval  = len(eval_ds) > 0
+    has_eval= len(eval_ds) > 0
     load_best = cfg.load_best_model_at_end and has_eval
 
     use_bf16 = cfg.bf16 and not on_cpu
     use_fp16 = cfg.fp16 and not on_cpu
 
     training_args = TrainingArguments(
-        output_dir                  = str(output_dir),
-        num_train_epochs            = cfg.num_train_epochs,
+        output_dir = str(output_dir),
+        num_train_epochs =cfg.num_train_epochs,
         per_device_train_batch_size = cfg.per_device_train_batch_size,
-        per_device_eval_batch_size  = cfg.per_device_eval_batch_size,
+        per_device_eval_batch_size= cfg.per_device_eval_batch_size,
         gradient_accumulation_steps = cfg.gradient_accumulation_steps,
-        learning_rate               = cfg.learning_rate,
-        lr_scheduler_type           = cfg.lr_scheduler_type,
-        warmup_steps                = max(1, int(cfg.warmup_ratio * max(len(train_ds), 1))),
-        weight_decay                = cfg.weight_decay,
-        max_grad_norm               = cfg.max_grad_norm,
-        optim                       = cfg.optim,
-        bf16                        = use_bf16,
-        fp16                        = use_fp16,
-        gradient_checkpointing      = cfg.gradient_checkpointing,
-        dataloader_num_workers      = cfg.dataloader_num_workers,
-        logging_steps               = cfg.logging_steps,
-        eval_strategy               = "steps" if has_eval else "no",
-        eval_steps                  = cfg.eval_steps if has_eval else None,
-        save_strategy               = "steps",
-        save_steps                  = cfg.save_steps,
-        save_total_limit            = cfg.save_total_limit,
-        load_best_model_at_end      = load_best,
-        metric_for_best_model       = cfg.metric_for_best_model if load_best else None,
-        greater_is_better           = cfg.greater_is_better,
-        report_to                   = cfg.report_to,
-        run_name                    = cfg.run_name,
-        seed                        = cfg.seed,
-        remove_unused_columns       = False,
-        label_names                 = ["labels"],
+        learning_rate =cfg.learning_rate,
+        lr_scheduler_type=cfg.lr_scheduler_type,
+        warmup_steps=max(1, int(cfg.warmup_ratio * max(len(train_ds), 1))),
+        weight_decay=cfg.weight_decay,
+        max_grad_norm =cfg.max_grad_norm,
+        optim = cfg.optim,
+        bf16= use_bf16,
+        fp16= use_fp16,
+        gradient_checkpointing = cfg.gradient_checkpointing,
+        dataloader_num_workers = cfg.dataloader_num_workers,
+        logging_steps =cfg.logging_steps,
+        eval_strategy ="steps" if has_eval else "no",
+        eval_steps = cfg.eval_steps if has_eval else None,
+        save_strategy ="steps",
+        save_steps = cfg.save_steps,
+        save_total_limit =cfg.save_total_limit,
+        load_best_model_at_end = load_best,
+        metric_for_best_model= cfg.metric_for_best_model if load_best else None,
+        greater_is_better=cfg.greater_is_better,
+        report_to= cfg.report_to,
+        run_name= cfg.run_name,
+        seed= cfg.seed,
+        remove_unused_columns= False,
+        label_names= ["labels"],
     )
     
     
@@ -186,13 +186,13 @@ def main():
                 logs["vram_gb"] = torch.cuda.memory_allocated() / 1e9
 
     trainer = Trainer(
-        model             = model,
-        args              = training_args,
-        train_dataset     = train_ds,
-        eval_dataset      = eval_ds if has_eval else None,
-        processing_class  = tokenizer,
-        data_collator     = collator,
-        callbacks         = [SampleOutputCallback(), VRAMLogCallback()],
+        model=model,
+        args=training_args,
+        train_dataset= train_ds,
+        eval_dataset = eval_ds if has_eval else None,
+        processing_class= tokenizer,
+        data_collator= collator,
+        callbacks = [SampleOutputCallback(), VRAMLogCallback()],
     )
 
     print(f"\n{'═'*56}")

@@ -76,7 +76,7 @@ def get_lora_config(cfg: BaseConfig) -> "LoraConfig":
 
 def load_model_for_training(cfg: BaseConfig, model_id_override: Optional[str] = None):
     model_id = model_id_override or cfg.base_model_id
-    stage    = getattr(cfg, "stage", "unknown")
+    stage = getattr(cfg, "stage", "unknown")
 
     print(f"\n{'─' * 56}")
     print(f"  Loading model for {stage}")
@@ -110,12 +110,12 @@ def load_model_for_training(cfg: BaseConfig, model_id_override: Optional[str] = 
         print(f"  ✓ Prepared for k-bit training")
         
     lora_cfg = get_lora_config(cfg)
-    model    = get_peft_model(model, lora_cfg)
+    model = get_peft_model(model, lora_cfg)
 
     adapter_type = "DoRA" if cfg.use_dora else "LoRA"
-    trainable    = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    total        = sum(p.numel() for p in model.parameters())
-    pct          = 100 * trainable / total
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total= sum(p.numel() for p in model.parameters())
+    pct= 100 * trainable / total
 
     print(f"  ✓ {adapter_type} applied — "
           f"trainable: {trainable:,} / {total:,} ({pct:.2f}%)")
@@ -150,14 +150,14 @@ def load_model_for_inference(model_path: str, device: str = "auto"):
 
 def merge_adapter(
     base_model_id:  str,
-    adapter_path:   str,
-    output_path:    str,
-    push_to_hub:    bool = False,
-    hub_repo_id:    str  = "",
+    adapter_path:str,
+    output_path: str,
+    push_to_hub: bool = False,
+    hub_repo_id: str= "",
 ):
     print(f"\n{'─' * 56}")
     print(f"  Merging adapter")
-    print(f"  Base:    {base_model_id}")
+    print(f"  Base: {base_model_id}")
     print(f"  Adapter: {adapter_path}")
     print(f"  Output:  {output_path}")
     print(f"{'─' * 56}")
@@ -196,9 +196,9 @@ def merge_adapter(
 
 
 def count_params(model) -> str:
-    total     = sum(p.numel() for p in model.parameters())
+    total= sum(p.numel() for p in model.parameters())
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    total_b   = total / 1e9
+    total_b= total / 1e9
     return f"{total_b:.2f}B total, {trainable:,} trainable"
 
 
@@ -210,13 +210,13 @@ def get_gpu_memory_gb() -> float:
 
 def print_model_summary(model):
     print(f"\n  Model summary:")
-    print(f"    Params:      {count_params(model)}")
-    print(f"    VRAM used:   {get_gpu_memory_gb():.2f} GB")
+    print(f"    Params: {count_params(model)}")
+    print(f"    VRAM used:{get_gpu_memory_gb():.2f} GB")
     if hasattr(model, "config"):
         cfg = model.config
         print(f"    Hidden size: {getattr(cfg, 'hidden_size', '?')}")
-        print(f"    Layers:      {getattr(cfg, 'num_hidden_layers', '?')}")
-        print(f"    Heads:       {getattr(cfg, 'num_attention_heads', '?')}")
+        print(f"    Layers: {getattr(cfg, 'num_hidden_layers', '?')}")
+        print(f"    Heads:  {getattr(cfg, 'num_attention_heads', '?')}")
 
 if __name__ == "__main__":
 
@@ -227,7 +227,7 @@ if __name__ == "__main__":
 
     if PEFT_AVAILABLE:
         for stage in ["stage1", "stage2", "stage3"]:
-            cfg      = get_config(stage)
+            cfg = get_config(stage)
             lora_cfg = get_lora_config(cfg)
             assert lora_cfg.r == cfg.lora_r
             assert lora_cfg.use_dora == cfg.use_dora

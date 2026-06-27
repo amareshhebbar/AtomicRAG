@@ -40,29 +40,36 @@ def main():
     on_cpu = args.local_test or not torch.cuda.is_available()
 
     overrides = {}
-    if args.learning_rate: overrides["learning_rate"]    = args.learning_rate
-    if args.max_samples:   overrides["max_train_samples"] = args.max_samples
-    if args.no_wandb:      overrides["report_to"]        = "none"
+    if args.learning_rate: 
+        overrides["learning_rate"]= args.learning_rate
+    if args.max_samples:
+        overrides["max_train_samples"] = args.max_samples
+    if args.no_wandb:  
+        overrides["report_to"] = "none"
 
     if args.local_test:
         overrides.update({
-            "device_map":              "cpu",
-            "use_4bit":                False,
-            "bf16":                    False,
-            "fp16":                    False,
-            "optim":                   "adamw_torch",
+            "device_map": "cpu",
+            "use_4bit": False,
+            "bf16": False,
+            "fp16": False,
+            "optim":  "adamw_torch",
             "dataloader_num_workers":  0,
             "load_best_model_at_end":  False,
-            "report_to":               "none",
-            "max_train_samples":       20,
-            "max_eval_samples":        5,
-            "max_seq_length":          256,
-            "num_train_epochs":        1,
-            "lora_r":                  4,
-            "lora_alpha":              8,
-            "logging_steps":           1,
-            "eval_steps":              5,
-            "save_steps":              5,
+            "report_to":  "none",
+            "max_train_samples":20,
+            "max_eval_samples": 5,
+            "max_seq_length":256,
+            "num_train_epochs": 1,
+            "lora_r": 4,
+            "lora_alpha":8,
+            "logging_steps":1,
+            "eval_steps":5,
+            "save_steps":5,
+            "per_device_train_batch_size": 1,
+            "per_device_eval_batch_size":  1,
+            "gradient_accumulation_steps": 1,
+            "gradient_checkpointing":False,
         })
 
     cfg = get_config("stage2", **overrides)
@@ -79,7 +86,7 @@ def main():
             base_model_path = cfg.base_model_id
             print(f"  Stage 1 merged not found → using base: {base_model_path}")
 
-    output_dir      = ROOT / cfg.output_dir
+    output_dir = ROOT / cfg.output_dir
     hf_dataset_path = ROOT / cfg.hf_dataset_path
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -102,55 +109,55 @@ def main():
         sys.exit(1)
 
     train_ds = SFTDataset(str(hf_dataset_path), tokenizer, cfg,
-                          "train",      cfg.max_train_samples)
-    eval_ds  = SFTDataset(str(hf_dataset_path), tokenizer, cfg,
-                          "validation", cfg.max_eval_samples)
+             "train",      cfg.max_train_samples)
+    eval_ds= SFTDataset(str(hf_dataset_path), tokenizer, cfg,
+             "validation", cfg.max_eval_samples)
     collator = get_sft_collator(tokenizer, cfg.max_seq_length)
 
-    has_eval  = len(eval_ds) > 0
+    has_eval= len(eval_ds) > 0
     load_best = cfg.load_best_model_at_end and has_eval
-    use_bf16  = cfg.bf16 and not on_cpu
-    use_fp16  = cfg.fp16 and not on_cpu
+    use_bf16= cfg.bf16 and not on_cpu
+    use_fp16= cfg.fp16 and not on_cpu
 
     training_args = TrainingArguments(
-        output_dir                  = str(output_dir),
-        num_train_epochs            = cfg.num_train_epochs,
+        output_dir = str(output_dir),
+        num_train_epochs = cfg.num_train_epochs,
         per_device_train_batch_size = cfg.per_device_train_batch_size,
-        per_device_eval_batch_size  = cfg.per_device_eval_batch_size,
+        per_device_eval_batch_size= cfg.per_device_eval_batch_size,
         gradient_accumulation_steps = cfg.gradient_accumulation_steps,
-        learning_rate               = cfg.learning_rate,
-        lr_scheduler_type           = cfg.lr_scheduler_type,
-        warmup_steps                = max(1, int(cfg.warmup_ratio * max(len(train_ds), 1))),
-        weight_decay                = cfg.weight_decay,
-        max_grad_norm               = cfg.max_grad_norm,
-        optim                       = cfg.optim,
-        bf16                        = use_bf16,
-        fp16                        = use_fp16,
-        gradient_checkpointing      = cfg.gradient_checkpointing,
-        dataloader_num_workers      = cfg.dataloader_num_workers,
-        logging_steps               = cfg.logging_steps,
-        eval_strategy               = "steps" if has_eval else "no",
-        eval_steps                  = cfg.eval_steps if has_eval else None,
-        save_strategy               = "steps",
-        save_steps                  = cfg.save_steps,
-        save_total_limit            = cfg.save_total_limit,
-        load_best_model_at_end      = load_best,
-        metric_for_best_model       = cfg.metric_for_best_model if load_best else None,
-        greater_is_better           = cfg.greater_is_better,
-        report_to                   = cfg.report_to,
-        run_name                    = cfg.run_name,
-        seed                        = cfg.seed,
-        remove_unused_columns       = False,
-        label_names                 = ["labels"],
+        learning_rate = cfg.learning_rate,
+        lr_scheduler_type= cfg.lr_scheduler_type,
+        warmup_steps = max(1, int(cfg.warmup_ratio * max(len(train_ds), 1))),
+        weight_decay = cfg.weight_decay,
+        max_grad_norm= cfg.max_grad_norm,
+        optim = cfg.optim,
+        bf16 = use_bf16,
+        fp16 = use_fp16,
+        gradient_checkpointing = cfg.gradient_checkpointing,
+        dataloader_num_workers = cfg.dataloader_num_workers,
+        logging_steps = cfg.logging_steps,
+        eval_strategy = "steps" if has_eval else "no",
+        eval_steps = cfg.eval_steps if has_eval else None,
+        save_strategy= "steps",
+        save_steps= cfg.save_steps,
+        save_total_limit= cfg.save_total_limit,
+        load_best_model_at_end = load_best,
+        metric_for_best_model= cfg.metric_for_best_model if load_best else None,
+        greater_is_better = cfg.greater_is_better,
+        report_to= cfg.report_to,
+        run_name = cfg.run_name,
+        seed= cfg.seed,
+        remove_unused_columns= False,
+        label_names= ["labels"],
     )
 
     trainer = Trainer(
-        model            = model,
-        args             = training_args,
-        train_dataset    = train_ds,
-        eval_dataset     = eval_ds if has_eval else None,
+        model = model,
+        args= training_args,
+        train_dataset= train_ds,
+        eval_dataset= eval_ds if has_eval else None,
         processing_class = tokenizer,
-        data_collator    = collator,
+        data_collator= collator,
     )
 
     print(f"\n{'═'*56}")

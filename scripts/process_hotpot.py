@@ -13,9 +13,9 @@ except ImportError:
     print("[ERROR] Run: pip install datasets pandas tqdm")
     sys.exit(1)
 
-ROOT     = Path(__file__).resolve().parent.parent
-RAW_DIR  = ROOT / "data" / "raw" / "hotpotqa"
-OUT_DIR  = ROOT / "data" / "processed"
+ROOT= Path(__file__).resolve().parent.parent
+RAW_DIR= ROOT / "data" / "raw" / "hotpotqa"
+OUT_DIR= ROOT / "data" / "processed"
 
 SYSTEM_PROMPT = (
     "You are a query decomposition engine. "
@@ -31,8 +31,8 @@ SYSTEM_PROMPT = (
 
 
 def extract_supporting_titles(row: dict) -> list[str]:
-    facts   = row.get("supporting_facts", {})
-    titles  = facts.get("title", []) if isinstance(facts, dict) else []
+    facts= row.get("supporting_facts", {})
+    titles= facts.get("title", []) if isinstance(facts, dict) else []
     return list(dict.fromkeys(titles))   
 
 
@@ -45,12 +45,12 @@ def build_bridge_decomposition(question: str, titles: list[str]) -> list[dict]:
 
     return [
         {
-            "hop":        1,
+            "hop":1,
             "sub_query":  f"What information about {t1} is relevant to: {q_clean}?",
             "depends_on": [],
         },
         {
-            "hop":        2,
+            "hop":2,
             "sub_query":  f"Given what was found about {t1}, {question}",
             "depends_on": [1],
         },
@@ -65,12 +65,12 @@ def build_comparison_decomposition(question: str, titles: list[str]) -> list[dic
 
     return [
         {
-            "hop":        1,
+            "hop":1,
             "sub_query":  f"What is the relevant attribute of {t1} for the comparison?",
             "depends_on": [],  
         },
         {
-            "hop":        2,
+            "hop":2,
             "sub_query":  f"What is the relevant attribute of {t2} for the comparison?",
             "depends_on": [],   
         },
@@ -79,9 +79,9 @@ def build_comparison_decomposition(question: str, titles: list[str]) -> list[dic
 
 def process_row(row: dict, idx: int, split: str, filter_type: Optional[str]) -> Optional[dict]:
     """Process a single HotpotQA row."""
-    q_type   = row.get("type", "bridge")
+    q_type= row.get("type", "bridge")
     question = row.get("question", "").strip()
-    answer   = row.get("answer", "").strip()
+    answer= row.get("answer", "").strip()
 
     if not question:
         return None
@@ -92,10 +92,10 @@ def process_row(row: dict, idx: int, split: str, filter_type: Optional[str]) -> 
     titles = extract_supporting_titles(row)
 
     if q_type == "comparison":
-        dep_graph  = build_comparison_decomposition(question, titles)
+        dep_graph= build_comparison_decomposition(question, titles)
         complexity = "comparison_2hop"
     else:
-        dep_graph  = build_bridge_decomposition(question, titles)
+        dep_graph= build_bridge_decomposition(question, titles)
         complexity = "bridge_2hop"
 
     messages = [
@@ -105,15 +105,15 @@ def process_row(row: dict, idx: int, split: str, filter_type: Optional[str]) -> 
     ]
 
     return {
-        "id":                  f"hotpotqa_{split}_{idx:06d}",
-        "domain":              "wikipedia",
-        "source":              "hotpotqa",
-        "hop_count":           2,
-        "complexity":          complexity,
-        "messages":            messages,
+        "id":f"hotpotqa_{split}_{idx:06d}",
+        "domain": "wikipedia",
+        "source": "hotpotqa",
+        "hop_count":2,
+        "complexity":complexity,
+        "messages": messages,
         "ground_truth_answer": answer,
-        "supporting_facts":    titles,
-        "quality_tier":        "heuristic",   
+        "supporting_facts": titles,
+        "quality_tier":"heuristic",   
     }
 
 
@@ -131,8 +131,8 @@ def process_split(split: str, max_rows: Optional[int], filter_type: Optional[str
 
     print(f"  Rows: {len(df):,}")
 
-    examples    = []
-    skipped     = 0
+    examples = []
+    skipped= 0
     type_counts = {}
 
     for idx, row in tqdm(df.iterrows(), total=len(df), desc=f"  Processing {split}"):
@@ -145,8 +145,8 @@ def process_split(split: str, max_rows: Optional[int], filter_type: Optional[str
         type_counts[c] = type_counts.get(c, 0) + 1
 
     print(f"  ✓ Converted:  {len(examples):,}")
-    print(f"  ✗ Skipped:    {skipped:,}")
-    print(f"  Types:        {type_counts}")
+    print(f"  ✗ Skipped: {skipped:,}")
+    print(f"  Types:{type_counts}")
     return examples
 
 
@@ -174,7 +174,7 @@ def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     train_examples = process_split("train",      args.max_rows, args.type)
-    val_examples   = process_split("validation", args.max_rows, args.type)
+    val_examples= process_split("validation", args.max_rows, args.type)
 
     if not train_examples and not val_examples:
         print("\n[ERROR] No examples processed. Run download_data.py first.")
@@ -186,9 +186,9 @@ def main():
     if train_examples:
         print(f"\n  SAMPLE:")
         s = train_examples[0]
-        print(f"  id:       {s['id']}")
+        print(f"  id:  {s['id']}")
         print(f"  question: {s['messages'][1]['content'][:80]}...")
-        print(f"  decomp:   {s['messages'][2]['content']}")
+        print(f"  decomp:{s['messages'][2]['content']}")
 
     print(f"\n✓ HotpotQA processing complete.")
 

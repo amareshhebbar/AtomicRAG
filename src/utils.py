@@ -25,7 +25,7 @@ def build_messages(question: str) -> list[dict]:
 
 def build_prompt(question: str, tokenizer) -> str:
     messages = build_messages(question)
-    prompt   = tokenizer.apply_chat_template(
+    prompt= tokenizer.apply_chat_template(
         messages,
         tokenize=False,
         add_generation_prompt=True,
@@ -44,7 +44,7 @@ def build_training_text(messages: list[dict], tokenizer) -> str:
 def _extract_json_block(text: str) -> Optional[str]:
     text = re.sub(r"```(?:json)?", "", text).strip()
     start = text.find("[")
-    end   = text.rfind("]")
+    end= text.rfind("]")
 
     if start == -1 or end == -1 or end <= start:
         return None
@@ -72,7 +72,7 @@ def parse_decomp_output(text: str) -> Optional[list[dict]]:
         if "hop" not in item or "sub_query" not in item or "depends_on" not in item:
             return None
         normalized.append({
-            "hop":        int(item["hop"]),
+            "hop":int(item["hop"]),
             "sub_query":  str(item["sub_query"]).strip(),
             "depends_on": [int(d) for d in item["depends_on"]],
         })
@@ -117,7 +117,7 @@ def format_dep_graph(graph: list[dict]) -> str:
 
 
 def format_example_for_log(question: str, graph: list[dict], answer: str = "") -> str:
-    out  = f"Q: {question}\n"
+    out= f"Q: {question}\n"
     out += format_dep_graph(graph)
     if answer:
         out += f"\nA: {answer}"
@@ -140,7 +140,7 @@ def truncate_messages_to_max_length(
         return messages
 
     user_idx = next(i for i, m in enumerate(messages) if m["role"] == "user")
-    words    = messages[user_idx]["content"].split()
+    words = messages[user_idx]["content"].split()
 
     while len(words) > 5:
         words = words[:-5]

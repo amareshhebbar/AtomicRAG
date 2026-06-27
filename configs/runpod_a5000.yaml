@@ -1,19 +1,19 @@
 stage1:
-  stage:                    stage1_qlora
-  output_dir:               outputs/stage1_qlora
-  run_name:                 stage1-qlora-r16
+  stage:  stage1_qlora
+  output_dir:  outputs/stage1_qlora
+  run_name: stage1-qlora-r16
 
-  base_model_id:            Qwen/Qwen2.5-1.5B-Instruct
-  use_4bit:                 true
-  bnb_4bit_quant_type:      nf4
-  bnb_4bit_compute_dtype:   bfloat16
-  bnb_double_quant:         true
-  max_seq_length:           1024
+  base_model_id: Qwen/Qwen2.5-1.5B-Instruct
+  use_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_compute_dtype:bfloat16
+  bnb_double_quant: true
+  max_seq_length:1024
 
-  lora_r:                   16
-  lora_alpha:               32
-  lora_dropout:             0.05
-  use_dora:                 false
+  lora_r: 16
+  lora_alpha:  32
+  lora_dropout:0.05
+  use_dora: false
   target_modules:
     - q_proj
     - k_proj
@@ -23,100 +23,100 @@ stage1:
     - up_proj
     - down_proj
 
-  num_train_epochs:         3
+  num_train_epochs: 3
   per_device_train_batch_size: 4
   per_device_eval_batch_size:  4
   gradient_accumulation_steps: 4          
-  learning_rate:            2e-4
-  lr_scheduler_type:        cosine
-  warmup_ratio:             0.05
-  weight_decay:             0.01
-  max_grad_norm:            1.0
-  optim:                    paged_adamw_32bit
+  learning_rate: 2e-4
+  lr_scheduler_type:cosine
+  warmup_ratio:0.05
+  weight_decay:0.01
+  max_grad_norm: 1.0
+  optim:  paged_adamw_32bit
 
-  gradient_checkpointing:   true
-  bf16:                     true
-  fp16:                     false
-  dataloader_num_workers:   4
+  gradient_checkpointing:true
+  bf16:true
+  fp16:false
+  dataloader_num_workers:4
 
-  logging_steps:            10
-  eval_steps:               100
-  save_steps:               100
-  save_total_limit:         3
-  load_best_model_at_end:   true
-  metric_for_best_model:    eval_loss
+  logging_steps: 10
+  eval_steps:  100
+  save_steps:  100
+  save_total_limit: 3
+  load_best_model_at_end:true
+  metric_for_best_model: eval_loss
 
-  report_to:                wandb
-  wandb_project:            querydecomp
+  report_to:wandb
+  wandb_project: querydecomp
 
 
 stage2:
-  stage:                    stage2_dora
-  output_dir:               outputs/stage2_dora
-  run_name:                 stage2-dora
-  stage1_merged_path:       outputs/stage1_merged
+  stage:  stage2_dora
+  output_dir:  outputs/stage2_dora
+  run_name: stage2-dora
+  stage1_merged_path:  outputs/stage1_merged
 
-  use_4bit:                 false         
-  max_seq_length:           1024
+  use_4bit: false         
+  max_seq_length:1024
 
-  lora_r:                   8             
-  lora_alpha:               16
-  lora_dropout:             0.05
-  use_dora:                 true          
+  lora_r: 8             
+  lora_alpha:  16
+  lora_dropout:0.05
+  use_dora: true          
 
-  num_train_epochs:         1             
+  num_train_epochs: 1             
   per_device_train_batch_size: 4
   gradient_accumulation_steps: 4
-  learning_rate:            5e-5          
-  lr_scheduler_type:        cosine
-  warmup_ratio:             0.05
-  weight_decay:             0.01
-  optim:                    paged_adamw_32bit
+  learning_rate: 5e-5          
+  lr_scheduler_type:cosine
+  warmup_ratio:0.05
+  weight_decay:0.01
+  optim:  paged_adamw_32bit
 
-  gradient_checkpointing:   true
-  bf16:                     true
+  gradient_checkpointing:true
+  bf16:true
 
-  logging_steps:            10
-  eval_steps:               50
-  save_steps:               50
-  save_total_limit:         2
+  logging_steps: 10
+  eval_steps:  50
+  save_steps:  50
+  save_total_limit: 2
 
-  report_to:                wandb
-  wandb_project:            querydecomp
+  report_to:wandb
+  wandb_project: querydecomp
 
 
 stage3:
-  stage:                    stage3_orpo
-  output_dir:               outputs/stage3_orpo
-  run_name:                 stage3-orpo
-  stage2_merged_path:       outputs/stage2_merged
+  stage:  stage3_orpo
+  output_dir:  outputs/stage3_orpo
+  run_name: stage3-orpo
+  stage2_merged_path:  outputs/stage2_merged
 
-  use_4bit:                 false
-  max_seq_length:           2048         
+  use_4bit: false
+  max_seq_length:2048         
 
-  lora_r:                   8
-  lora_alpha:               16
-  use_dora:                 false
+  lora_r: 8
+  lora_alpha:  16
+  use_dora: false
 
-  orpo_beta:                0.1           
+  orpo_beta:0.1           
 
-  num_train_epochs:         1
+  num_train_epochs: 1
   per_device_train_batch_size: 2         
   gradient_accumulation_steps: 8         
-  learning_rate:            5e-6          
-  lr_scheduler_type:        cosine
-  warmup_ratio:             0.05
-  weight_decay:             0.01
-  optim:                    paged_adamw_32bit
+  learning_rate: 5e-6          
+  lr_scheduler_type:cosine
+  warmup_ratio:0.05
+  weight_decay:0.01
+  optim:  paged_adamw_32bit
 
-  gradient_checkpointing:   true
-  bf16:                     true
+  gradient_checkpointing:true
+  bf16:true
 
-  logging_steps:            5
-  eval_steps:               50
-  save_steps:               50
-  save_total_limit:         2
+  logging_steps: 5
+  eval_steps:  50
+  save_steps:  50
+  save_total_limit: 2
 
-  report_to:                wandb
-  wandb_project:            querydecomp
+  report_to:wandb
+  wandb_project: querydecomp
 
