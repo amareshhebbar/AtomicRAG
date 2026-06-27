@@ -44,14 +44,44 @@ endif
 
 
 .DEFAULT_GOAL := all
-.PHONY: all setup venv install install-torch run \
+.PHONY: all setup venv install install-torch run check \
         data train eval dry reset clean env help \
         _data_step _stage1 _merge1 _stage2 _merge2 _stage3 _finalize _eval _report
 
-all: env setup _data_step _stage1 _merge1 _stage2 _merge2 _stage3 _finalize _eval _report
+check:
+	@echo ""
+	@echo "  ── Preflight checks ──────────────────────────────────"
+	@echo -n "  CUDA:          "
+	@$(PYTHON) -c "import torch; assert torch.cuda.is_available(), 'NOT FOUND'; print('OK  (' + torch.cuda.get_device_name(0) + ')')" 2>/dev/null || \
+		(echo "FAIL — no GPU detected. Check pod template or torch install." && exit 1)
+	@echo -n "  HF_TOKEN:      "
+	@test -n "$$HF_TOKEN" || (echo "FAIL — run: export \$$(cat .env | xargs)" && exit 1)
+	@$(PYTHON) -c "\
+import os, urllib.request, urllib.error; \
+req = urllib.request.Request('https://huggingface.co/api/whoami', headers={'Authorization': 'Bearer ' + os.environ['HF_TOKEN']}); \
+r = urllib.request.urlopen(req); print('OK  (' + __import__('json').loads(r.read())['name'] + ')')" 2>/dev/null || \
+		(echo "FAIL — HF_TOKEN invalid or network error" && exit 1)
+	@echo -n "  WANDB_API_KEY: "
+	@test -n "$$WANDB_API_KEY" || (echo "FAIL — WANDB_API_KEY not set" && exit 1)
+	@$(PYTHON) -c "\
+import os, urllib.request, json; \
+req = urllib.request.Request('https://api.wandb.ai/graphql', \
+  data=b'{\"query\":\"{viewer{entity}}\"}', \
+  headers={'Authorization': 'Bearer ' + os.environ['WANDB_API_KEY'], 'Content-Type': 'application/json'}); \
+r = urllib.request.urlopen(req); d = json.loads(r.read()); \
+entity = d['data']['viewer']['entity']; print('OK  (' + entity + ')')" 2>/dev/null || \
+		(echo "FAIL — WANDB_API_KEY invalid. Training will run with WANDB_MODE=disabled" && \
+		 export WANDB_MODE=disabled)
+	@echo "  ─────────────────────────────────────────────────────"
+	@echo "  ✓ All checks passed — starting pipeline"
+	@echo ""
+
+
+all: env setup check _data_step _stage1 _merge1 _stage2 _merge2 _stage3 _finalize _eval _report
 	@echo ""
 	@echo "  ✓ Full pipeline complete — $(_MODE)"
 	@echo ""
+
 
 env:
 	@if [ ! -f $(ENV_FILE) ]; then \
