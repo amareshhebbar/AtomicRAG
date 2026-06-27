@@ -3,7 +3,7 @@ from pathlib import Path
 from datetime import datetime
 
 THIS_FILE = Path(__file__).resolve()
-ROOT      = THIS_FILE.parent.parent
+ROOT = THIS_FILE.parent.parent
 sys.path.insert(0, str(ROOT))
 
 _env = ROOT / ".env"
@@ -16,10 +16,10 @@ if _env.exists():
 
 G="\033[92m"; Y="\033[93m"; R="\033[91m"; C="\033[96m"; B="\033[1m"; X="\033[0m"
 
-def ok(m):    print(f"  {G}✓{X} {m}")
+def ok(m): print(f"  {G}✓{X} {m}")
 def warn(m):  print(f"  {Y}⚠{X} {m}")
 def skip(m):  print(f"  {Y}⚡{X} {m}")
-def err(m):   print(f"  {R}✗{X} {m}")
+def err(m):print(f"  {R}✗{X} {m}")
 def info(m):  print(f"  {C}→{X} {m}")
 def head(t, n=None):
     tag = f"[PHASE {n}] " if n is not None else ""
@@ -73,13 +73,13 @@ def must(code, phase):
 def data_ok(name):
     c = {
         "raw_musique":  ROOT/"data/raw/musique/train.parquet",
-        "raw_hotpot":   ROOT/"data/raw/hotpotqa/train.parquet",
-        "raw_2wiki":    ROOT/"data/raw/2wikimultihopqa/train.parquet",
+        "raw_hotpot":ROOT/"data/raw/hotpotqa/train.parquet",
+        "raw_2wiki": ROOT/"data/raw/2wikimultihopqa/train.parquet",
         "musique_proc": ROOT/"data/processed/musique_train.jsonl",
         "hotpot_proc":  ROOT/"data/processed/hotpotqa_train.jsonl",
-        "wiki_proc":    ROOT/"data/processed/2wiki_train.jsonl",
-        "sft_hf":       ROOT/"data/processed/sft_dataset/dataset_dict.json",
-        "orpo_hf":      ROOT/"data/processed/orpo_dataset/dataset_dict.json",
+        "wiki_proc": ROOT/"data/processed/2wiki_train.jsonl",
+        "sft_hf":  ROOT/"data/processed/sft_dataset/dataset_dict.json",
+        "orpo_hf": ROOT/"data/processed/orpo_dataset/dataset_dict.json",
     }
     p = c.get(name)
     if p is None: return False
@@ -92,7 +92,7 @@ def model_ok(name):
         "s2_adapter": ROOT/"outputs/stage2_dora/final/adapter_config.json",
         "s2_merged":  ROOT/"outputs/stage2_merged/config.json",
         "s3_adapter": ROOT/"outputs/stage3_orpo/final/adapter_config.json",
-        "final":      ROOT/"outputs/final/config.json",
+        "final": ROOT/"outputs/final/config.json",
     }
     p = c.get(name); return p is not None and p.exists()
 
@@ -366,9 +366,9 @@ def phase10(state, timer, dry):
 
 def _load_result(key, results):
     paths = {
-        "eval_decomp":    "results/decomposition_metrics.json",
+        "eval_decomp": "results/decomposition_metrics.json",
         "eval_retrieval": "results/retrieval_metrics.json",
-        "eval_speed":     "results/speed_metrics.json",
+        "eval_speed":"results/speed_metrics.json",
     }
     p = ROOT/paths.get(key,"")
     if p.exists():
@@ -381,15 +381,15 @@ def _log_eval_wandb(results, dry):
     try:
         import wandb
         proj = os.environ.get("WANDB_PROJECT","querydecomp")
-        ent  = os.environ.get("WANDB_ENTITY","") or None
+        ent= os.environ.get("WANDB_ENTITY","") or None
         wandb.init(project=proj, entity=ent, name="final-evaluation",
                    tags=["eval","benchmark"], job_type="evaluation", reinit=True)
 
-        ft  = results.get("eval_decomp",{}).get("finetuned",{})
-        bs  = results.get("eval_decomp",{}).get("baseline",{})
+        ft= results.get("eval_decomp",{}).get("finetuned",{})
+        bs= results.get("eval_decomp",{}).get("baseline",{})
         ret = results.get("eval_retrieval",{})
         raw = ret.get("raw",{}); dec = ret.get("decomposed",{})
-        sp  = next((s for s in results.get("eval_speed",[]) if "QueryDecomp" in s.get("label","")), {}) \
+        sp= next((s for s in results.get("eval_speed",[]) if "QueryDecomp" in s.get("label","")), {}) \
               if isinstance(results.get("eval_speed"), list) else {}
 
         for m in ["json_parse_rate","hop_count_acc","hop_coverage_f1","dep_graph_acc"]:
@@ -413,10 +413,10 @@ def _log_eval_wandb(results, dry):
 
         wandb.run.summary.update({
             "final/hop_coverage_f1": ft.get("hop_coverage_f1",0),
-            "final/hop_count_acc":   ft.get("hop_count_acc",0),
+            "final/hop_count_acc":ft.get("hop_count_acc",0),
             "final/retrieval_hit3":  dec.get("hit@3",0),
-            "final/speed_p50_ms":    sp.get("p50_ms",0),
-            "final/cost_per_1k":     sp.get("cost_per_1k_usd",0),
+            "final/speed_p50_ms": sp.get("p50_ms",0),
+            "final/cost_per_1k":sp.get("cost_per_1k_usd",0),
         })
         wandb.finish(); ok("All eval metrics logged to W&B")
     except Exception as e:
@@ -456,19 +456,19 @@ def phase11(state, timer, dry):
 
 
 def _build_report(state, timer, results):
-    repo   = state.get("push_hub",{}).get("repo_id","AmareshHebbar/querydecomp-qwen2.5-1.5b")
-    now    = datetime.now().strftime("%Y-%m-%d %H:%M UTC")
-    total  = timer.total()
-    cost   = timer.cost()
-    rate   = os.environ.get("RUNPOD_HOURLY_RATE","0.22")
-    ent    = os.environ.get("WANDB_ENTITY","amareshhebbar")
-    proj   = os.environ.get("WANDB_PROJECT","querydecomp")
+    repo= state.get("push_hub",{}).get("repo_id","AmareshHebbar/querydecomp-qwen2.5-1.5b")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M UTC")
+    total= timer.total()
+    cost= timer.cost()
+    rate= os.environ.get("RUNPOD_HOURLY_RATE","0.22")
+    ent = os.environ.get("WANDB_ENTITY","amareshhebbar")
+    proj= os.environ.get("WANDB_PROJECT","querydecomp")
 
-    ft   = results.get("eval_decomp",{}).get("finetuned",{})
-    bs   = results.get("eval_decomp",{}).get("baseline",{})
-    ret  = results.get("eval_retrieval",{})
-    raw  = ret.get("raw",{})
-    dec  = ret.get("decomposed",{})
+    ft= results.get("eval_decomp",{}).get("finetuned",{})
+    bs= results.get("eval_decomp",{}).get("baseline",{})
+    ret= results.get("eval_retrieval",{})
+    raw= ret.get("raw",{})
+    dec= ret.get("decomposed",{})
     spds = results.get("eval_speed",[])
     ft_sp = next((s for s in spds if "QueryDecomp" in s.get("label","")), {}) if isinstance(spds,list) else {}
     g4_sp = next((s for s in spds if "GPT-4o" in s.get("label","")), {"p50_ms":1800,"p95_ms":3200,"cost_per_1k_usd":30.0}) if isinstance(spds,list) else {}
@@ -690,14 +690,14 @@ pre{{background:#111118;border:1px solid #1e1e2e;border-radius:6px;padding:20px;
   <pre>from transformers import AutoModelForCausalLM, AutoTokenizer
 import json, torch
 
-model_id  = "{repo}"
+model_id= "{repo}"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
-model     = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype="auto", device_map="auto")
+model= AutoModelForCausalLM.from_pretrained(model_id, torch_dtype="auto", device_map="auto")
 
 def decompose(question):
     msgs = [{{"role":"system","content":"Return ONLY a JSON array: hop, sub_query, depends_on."}},
             {{"role":"user","content":question}}]
-    text   = tokenizer.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
+    text= tokenizer.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
     inputs = tokenizer(text, return_tensors="pt").to(model.device)
     with torch.no_grad():
         out = model.generate(**inputs, max_new_tokens=300, do_sample=False)
@@ -723,7 +723,7 @@ def _push_report_wandb(md, html, results, state, timer):
     try:
         import wandb
         proj = os.environ.get("WANDB_PROJECT","querydecomp")
-        ent  = os.environ.get("WANDB_ENTITY","") or None
+        ent= os.environ.get("WANDB_ENTITY","") or None
         repo = state.get("push_hub",{}).get("repo_id","AmareshHebbar/querydecomp-qwen2.5-1.5b")
 
         wandb.init(project=proj, entity=ent, name="benchmark-report",
@@ -732,22 +732,22 @@ def _push_report_wandb(md, html, results, state, timer):
         artifact = wandb.Artifact("benchmark-report", type="report",
                                   description="Decomp F1, retrieval hit@k, speed benchmark")
         with tempfile.TemporaryDirectory() as tmp:
-            md_p   = os.path.join(tmp,"benchmark_report.md")
+            md_p= os.path.join(tmp,"benchmark_report.md")
             html_p = os.path.join(tmp,"benchmark_report.html")
             open(md_p,"w").write(md); open(html_p,"w").write(html)
             artifact.add_file(md_p,"benchmark_report.md")
             artifact.add_file(html_p,"benchmark_report.html")
             wandb.log_artifact(artifact)
 
-        ft  = results.get("eval_decomp",{}).get("finetuned",{})
+        ft= results.get("eval_decomp",{}).get("finetuned",{})
         dec = results.get("eval_retrieval",{}).get("decomposed",{})
-        sp  = next((s for s in results.get("eval_speed",[]) if "QueryDecomp" in s.get("label","")),{}) if isinstance(results.get("eval_speed"),list) else {}
+        sp= next((s for s in results.get("eval_speed",[]) if "QueryDecomp" in s.get("label","")),{}) if isinstance(results.get("eval_speed"),list) else {}
         wandb.run.summary.update({
             "final/hop_coverage_f1": ft.get("hop_coverage_f1",0),
             "final/retrieval_hit3":  dec.get("hit@3",0),
-            "final/speed_p50_ms":    sp.get("p50_ms",0),
+            "final/speed_p50_ms": sp.get("p50_ms",0),
             "final/total_cost_usd":  float(timer.cost().replace("$","")),
-            "final/hf_model":        f"https://huggingface.co/{repo}",
+            "final/hf_model":f"https://huggingface.co/{repo}",
         })
         wandb.finish(); ok("Report pushed to W&B as artifact")
     except Exception as e:
@@ -755,9 +755,9 @@ def _push_report_wandb(md, html, results, state, timer):
 
 def phase12(state, timer):
     head("Complete — Summary", 12)
-    repo  = state.get("push_hub",{}).get("repo_id","AmareshHebbar/querydecomp-qwen2.5-1.5b")
-    ent   = os.environ.get("WANDB_ENTITY","amareshhebbar")
-    proj  = os.environ.get("WANDB_PROJECT","querydecomp")
+    repo= state.get("push_hub",{}).get("repo_id","AmareshHebbar/querydecomp-qwen2.5-1.5b")
+    ent= os.environ.get("WANDB_ENTITY","amareshhebbar")
+    proj= os.environ.get("WANDB_PROJECT","querydecomp")
 
     def e(k): return state.get(k,{}).get("elapsed","N/A")
 
@@ -774,16 +774,16 @@ def phase12(state, timer):
 {B}  Estimated cost:{X}    {timer.cost()}
 
 {B}  Outputs:{X}
-    Model:          https://huggingface.co/{repo}
+    Model:https://huggingface.co/{repo}
     W&B dashboard:  https://wandb.ai/{ent}/{proj}
     Report (HTML):  results/benchmark_report.html
-    Report (MD):    results/benchmark_report.md
-    Metrics JSON:   results/all_metrics.json
+    Report (MD): results/benchmark_report.md
+    Metrics JSON:results/all_metrics.json
 
 {B}  Quick inference:{X}
     from transformers import pipeline
     pipe = pipeline("text-generation", model="{repo}")
-    out  = pipe("Who directed Inception and where was that person born?",
+    out= pipe("Who directed Inception and where was that person born?",
                 max_new_tokens=200, do_sample=False)
     print(out[0]["generated_text"])
 
@@ -810,7 +810,7 @@ Examples:
     args = p.parse_args()
 
     timer = Timer()
-    dry   = args.dry_run
+    dry= args.dry_run
 
     print(f"\n{B}{'═'*64}\n  QueryDecomp — Master Orchestrator\n  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n  Dry run: {dry}\n{'═'*64}{X}")
 
@@ -844,7 +844,7 @@ Examples:
     except KeyboardInterrupt:
         print(f"\n{Y}  Interrupted.{X}")
         info("State saved. Resume: python runpod/run_all.py")
-        info("Jump to phase N:    python runpod/run_all.py --from_phase N")
+        info("Jump to phase N: python runpod/run_all.py --from_phase N")
         sys.exit(130)
 
 

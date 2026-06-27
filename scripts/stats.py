@@ -10,12 +10,12 @@ except ImportError:
     print("[ERROR] Run: pip install datasets")
     sys.exit(1)
 
-ROOT     = Path(__file__).resolve().parent.parent
+ROOT= Path(__file__).resolve().parent.parent
 PROC_DIR = ROOT / "data" / "processed"
 
 SPLIT_FILES = {
     "train": PROC_DIR / "train_sft.jsonl",
-    "val":   PROC_DIR / "val_sft.jsonl",
+    "val":PROC_DIR / "val_sft.jsonl",
     "test":  PROC_DIR / "test_sft.jsonl",
 }
 
@@ -43,13 +43,13 @@ def analyze_split(name: str, examples: list[dict], source_filter: str | None):
         print(f"\n  [{name.upper()}] No examples found.")
         return
 
-    hop_counts   = defaultdict(int)
-    sources      = defaultdict(int)
+    hop_counts= defaultdict(int)
+    sources = defaultdict(int)
     complexities = defaultdict(int)
-    domains      = defaultdict(int)
+    domains = defaultdict(int)
     quality_tiers= defaultdict(int)
-    sq_lengths   = [] 
-    total_hops   = 0
+    sq_lengths= [] 
+    total_hops= 0
 
     for ex in examples:
         hop_counts[ex.get("hop_count", "?")]     += 1
@@ -60,10 +60,10 @@ def analyze_split(name: str, examples: list[dict], source_filter: str | None):
 
         try:
             messages = ex.get("messages", [])
-            asst     = next(m["content"] for m in messages if m["role"] == "assistant")
+            asst= next(m["content"] for m in messages if m["role"] == "assistant")
             dep_graph = json.loads(asst)
             for hop in dep_graph:
-                sq  = hop.get("sub_query", "")
+                sq= hop.get("sub_query", "")
                 sq_lengths.append(len(sq.split()))
                 total_hops += 1
         except Exception:
@@ -94,8 +94,8 @@ def analyze_split(name: str, examples: list[dict], source_filter: str | None):
 
     if sq_lengths:
         avg = sum(sq_lengths) / len(sq_lengths)
-        mn  = min(sq_lengths)
-        mx  = max(sq_lengths)
+        mn= min(sq_lengths)
+        mx= max(sq_lengths)
         print(f"\n  Sub-query word length: min={mn}  avg={avg:.1f}  max={mx}")
         print(f"  Total sub-queries generated: {total_hops:,}")
         print(f"  Avg sub-queries per question: {total_hops/n:.2f}")
@@ -123,8 +123,8 @@ def check_hf_dataset():
         print(f"    dsd = load_from_disk('data/processed/sft_dataset')")
         print(f"    sample = dsd['train'][0]")
         sample = dsd["train"][0]
-        msgs   = json.loads(sample["messages_json"])
-        print(f"    dsd['train'][0]['id']       = {sample['id']}")
+        msgs= json.loads(sample["messages_json"])
+        print(f"    dsd['train'][0]['id']= {sample['id']}")
         print(f"    dsd['train'][0]['hop_count']= {sample['hop_count']}")
         print(f"    messages[1]['content'][:60] = {msgs[1]['content'][:60]}...")
     except Exception as e:

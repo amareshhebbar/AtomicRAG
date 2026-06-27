@@ -14,20 +14,20 @@ except ImportError:
     print("[ERROR] Run: pip install datasets tqdm")
     sys.exit(1)
 
-ROOT          = Path(__file__).resolve().parent.parent
-PROC_DIR      = ROOT / "data" / "processed"
-RANDOM_SEED   = 42
+ROOT= Path(__file__).resolve().parent.parent
+PROC_DIR = ROOT / "data" / "processed"
+RANDOM_SEED= 42
 
 N_REJECTED_PER_EXAMPLE = 5
 
 
-FAKE_PEOPLE    = ["Dr. Alan Voss", "Marie Kessler", "Jonathan Crane", "Priya Mehta",
+FAKE_PEOPLE = ["Dr. Alan Voss", "Marie Kessler", "Jonathan Crane", "Priya Mehta",
                   "Robert Finch", "Lena Hartmann", "David Osei", "Chen Wei"]
-FAKE_PLACES    = ["Veloria", "Dunstable", "Kraetheim", "Molvenia", "Santhera",
+FAKE_PLACES = ["Veloria", "Dunstable", "Kraetheim", "Molvenia", "Santhera",
                   "New Colworth", "Port Albrecht", "Estravia"]
 FAKE_COMPANIES = ["Vexar Systems", "Lumentech", "CoreAxis", "Proxima Labs",
                   "Stelara Group", "Nexfield Industries"]
-FAKE_YEARS     = ["1987", "1993", "2001", "2007", "2011", "2017", "2019"]
+FAKE_YEARS= ["1987", "1993", "2001", "2007", "2011", "2017", "2019"]
 
 _ENTITY_RE = re.compile(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b')
 
@@ -45,7 +45,7 @@ def _replace_entity(text: str, rng: random.Random) -> str:
         return text
 
     target = rng.choice(entities)
-    pool   = FAKE_PEOPLE + FAKE_PLACES + FAKE_COMPANIES
+    pool= FAKE_PEOPLE + FAKE_PLACES + FAKE_COMPANIES
     replacement = rng.choice([p for p in pool if p != target])
     return text.replace(target, replacement, 1)
 
@@ -61,12 +61,12 @@ def rejection_merged_hops(dep_graph: list[dict], rng: random.Random) -> Optional
             merged_q = f"{hop_a['sub_query'].rstrip('?')} and {hop_b['sub_query'].lower()}"
             new_graph = [deepcopy(h) for h in dep_graph if h["hop"] not in (hop_a["hop"], hop_b["hop"])]
             merged_hop = {
-                "hop":        1,
+                "hop":1,
                 "sub_query":  merged_q,
                 "depends_on": [],
             }
             remaining = sorted(new_graph, key=lambda h: h["hop"])
-            result    = [merged_hop]
+            result = [merged_hop]
             for j, h in enumerate(remaining, start=2):
                 h["hop"] = j
                 h["depends_on"] = []   
@@ -109,17 +109,17 @@ def rejection_over_decomp(dep_graph: list[dict], rng: random.Random) -> list[dic
         sq = hop["sub_query"]
         split_hops = [
             {
-                "hop":        hop_offset + 1,
+                "hop":hop_offset + 1,
                 "sub_query":  f"What is the subject being asked about in: {sq}",
                 "depends_on": [],
             },
             {
-                "hop":        hop_offset + 2,
+                "hop":hop_offset + 2,
                 "sub_query":  sq,
                 "depends_on": [hop_offset + 1],
             },
             {
-                "hop":        hop_offset + 3,
+                "hop":hop_offset + 3,
                 "sub_query":  f"Confirm the answer found for: {sq}",
                 "depends_on": [hop_offset + 2],
             },
@@ -134,10 +134,10 @@ def rejection_missing_hop(dep_graph: list[dict], rng: random.Random) -> Optional
     if len(dep_graph) < 3:
         return None
     middle_idx = rng.randint(1, len(dep_graph) - 2)
-    new_graph  = [h for i, h in enumerate(dep_graph) if i != middle_idx]
+    new_graph= [h for i, h in enumerate(dep_graph) if i != middle_idx]
 
     for i, hop in enumerate(new_graph):
-        hop["hop"]        = i + 1
+        hop["hop"]= i + 1
         hop["depends_on"] = [] if i == 0 else [i]
 
     return new_graph
@@ -150,8 +150,8 @@ REJECTION_TYPES = ["merged_hops", "hallucinated", "zero_decomp", "over_decomp", 
 def build_rejected_variants(
     question:  str,
     dep_graph: list[dict],
-    rng:       random.Random,
-    n_max:     int = N_REJECTED_PER_EXAMPLE,
+    rng:  random.Random,
+    n_max:int = N_REJECTED_PER_EXAMPLE,
 ) -> list[tuple[str, str]]:
     variants = []
 
@@ -175,7 +175,7 @@ def build_rejected_variants(
             continue
 
         rejected_json = json.dumps(result, ensure_ascii=False)
-        chosen_json   = json.dumps(dep_graph, ensure_ascii=False)
+        chosen_json= json.dumps(dep_graph, ensure_ascii=False)
         if rejected_json == chosen_json:
             continue
 
@@ -185,10 +185,10 @@ def build_rejected_variants(
 
 
 def process_sft_file(
-    path:       Path,
-    split:      str,
-    rng:        random.Random,
-    max_rows:   Optional[int],
+    path:  Path,
+    split: str,
+    rng:random.Random,
+    max_rows:Optional[int],
     n_rejected: int,
 ) -> list[dict]:
     if not path.exists():
@@ -201,8 +201,8 @@ def process_sft_file(
     if max_rows:
         raw_lines = raw_lines[:max_rows]
 
-    pairs      = []
-    pair_idx   = 0
+    pairs = []
+    pair_idx= 0
     type_counts= {t: 0 for t in REJECTION_TYPES}
 
     for line in tqdm(raw_lines, desc=f"  Building ORPO pairs [{split}]"):
@@ -230,13 +230,13 @@ def process_sft_file(
 
         for rejected_json, rtype in variants:
             pairs.append({
-                "id":             f"orpo_{split}_{pair_idx:06d}",
-                "question":       question,
-                "chosen_json":    chosen_json,
+                "id":f"orpo_{split}_{pair_idx:06d}",
+                "question":  question,
+                "chosen_json": chosen_json,
                 "rejected_json":  rejected_json,
                 "rejection_type": rtype,
-                "source":         ex.get("source", ""),
-                "hop_count":      ex.get("hop_count", 2),
+                "source": ex.get("source", ""),
+                "hop_count": ex.get("hop_count", 2),
             })
             type_counts[rtype] += 1
             pair_idx += 1
@@ -270,7 +270,7 @@ def build_hf_dataset(train: list[dict], val: list[dict]) -> DatasetDict:
 
     splits = {}
     if train:
-        splits["train"]      = make_ds(train)
+        splits["train"] = make_ds(train)
     if val:
         splits["validation"] = make_ds(val)
 
@@ -319,7 +319,7 @@ def main():
         write_jsonl(val_pairs, PROC_DIR / "orpo_val.jsonl")
 
     print(f"\n  Building HuggingFace DatasetDict...")
-    dsd       = build_hf_dataset(train_pairs, val_pairs)
+    dsd= build_hf_dataset(train_pairs, val_pairs)
     save_path = PROC_DIR / "orpo_dataset"
     dsd.save_to_disk(str(save_path))
     print(f"  → {save_path.relative_to(ROOT)}/")
@@ -330,10 +330,10 @@ def main():
         print(f"\n{'─' * 60}")
         print("  SAMPLE ORPO PAIR:")
         s = train_pairs[0]
-        print(f"  Question:      {s['question']}")
-        print(f"  Chosen:        {s['chosen_json']}")
-        print(f"  Rejected:      {s['rejected_json']}")
-        print(f"  Reject type:   {s['rejection_type']}")
+        print(f"  Question: {s['question']}")
+        print(f"  Chosen:{s['chosen_json']}")
+        print(f"  Rejected: {s['rejected_json']}")
+        print(f"  Reject type:{s['rejection_type']}")
 
     print(f"\n✓ ORPO pair generation complete.")
     print(f"  Total pairs: {len(train_pairs) + len(val_pairs):,}")

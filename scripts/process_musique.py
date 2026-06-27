@@ -12,9 +12,9 @@ except ImportError:
     print("[ERROR] Run: pip install datasets pandas tqdm")
     sys.exit(1)
 
-ROOT       = Path(__file__).resolve().parent.parent
-RAW_DIR    = ROOT / "data" / "raw" / "musique"
-OUT_DIR    = ROOT / "data" / "processed"
+ROOT= Path(__file__).resolve().parent.parent
+RAW_DIR = ROOT / "data" / "raw" / "musique"
+OUT_DIR = ROOT / "data" / "processed"
 
 SYSTEM_PROMPT = (
     "You are a query decomposition engine. "
@@ -32,10 +32,10 @@ SYSTEM_PROMPT = (
 def decomposition_to_dependency_graph(decomp: list[dict]) -> list[dict]:
     graph = []
     for i, hop in enumerate(decomp):
-        hop_num    = i + 1
+        hop_num = i + 1
         depends_on = [] if i == 0 else [i]   
         graph.append({
-            "hop":        hop_num,
+            "hop":hop_num,
             "sub_query":  hop["question"].strip(),
             "depends_on": depends_on,
         })
@@ -91,14 +91,14 @@ def process_row(row: dict, idx: int, split: str) -> Optional[dict]:
 
     dep_graph = decomposition_to_dependency_graph(decomp)
     example = {
-        "id":                   f"musique_{split}_{idx:06d}",
-        "domain":               "wikipedia",
-        "source":               "musique",
-        "hop_count":            len(decomp),
-        "complexity":           infer_complexity(row),
-        "messages":             build_messages(row["question"], dep_graph),
+        "id": f"musique_{split}_{idx:06d}",
+        "domain":  "wikipedia",
+        "source":  "musique",
+        "hop_count": len(decomp),
+        "complexity":infer_complexity(row),
+        "messages":build_messages(row["question"], dep_graph),
         "ground_truth_answer":  row.get("answer", ""),
-        "supporting_facts":     [
+        "supporting_facts":[
             {"id": h.get("id", ""), "answer": h.get("answer", "")}
             for h in decomp
         ],
@@ -120,8 +120,8 @@ def process_split(split: str, max_rows: Optional[int]) -> list[dict]:
 
     print(f"  Rows loaded: {len(df):,}")
 
-    examples   = []
-    skipped    = 0
+    examples= []
+    skipped = 0
     hop_counts = {}
 
     for idx, row in tqdm(df.iterrows(), total=len(df), desc=f"  Processing {split}"):
@@ -133,8 +133,8 @@ def process_split(split: str, max_rows: Optional[int]) -> list[dict]:
         hc = result["hop_count"]
         hop_counts[hc] = hop_counts.get(hc, 0) + 1
 
-    print(f"  ✓ Converted:   {len(examples):,}")
-    print(f"  ✗ Skipped:     {skipped:,}  (unanswerable or malformed)")
+    print(f"  ✓ Converted:{len(examples):,}")
+    print(f"  ✗ Skipped:{skipped:,}  (unanswerable or malformed)")
     print(f"  Hop distribution: {dict(sorted(hop_counts.items()))}")
     return examples
 
@@ -156,7 +156,7 @@ def write_hf_dataset(train: list[dict], val: list[dict], out_dir: Path):
         }
 
     train_ds = Dataset.from_list(train)
-    val_ds   = Dataset.from_list(val)
+    val_ds= Dataset.from_list(val)
 
     train_ds = train_ds.map(
         lambda ex: {"messages_json": json.dumps(ex["messages"])},
@@ -191,7 +191,7 @@ def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     train_examples = process_split("train",      args.max_rows)
-    val_examples   = process_split("validation", args.max_rows)
+    val_examples= process_split("validation", args.max_rows)
 
     if not train_examples and not val_examples:
         print("\n[ERROR] No examples processed. Run download_data.py first.")
@@ -212,11 +212,11 @@ def main():
         print("  SAMPLE OUTPUT (first training example):")
         print(f"{'─' * 60}")
         sample = train_examples[0]
-        print(f"  id:         {sample['id']}")
+        print(f"  id: {sample['id']}")
         print(f"  hop_count:  {sample['hop_count']}")
         print(f"  complexity: {sample['complexity']}")
-        print(f"  question:   {sample['messages'][1]['content'][:80]}...")
-        print(f"  decomp:     {sample['messages'][2]['content']}")
+        print(f"  question:{sample['messages'][1]['content'][:80]}...")
+        print(f"  decomp:{sample['messages'][2]['content']}")
 
     print(f"\n✓ MuSiQue processing complete.")
 

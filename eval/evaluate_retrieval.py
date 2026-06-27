@@ -19,7 +19,7 @@ class BM25Retriever:
             from rank_bm25 import BM25Okapi
 
         tokenized = [doc.lower().split() for doc in corpus]
-        self.bm25  = BM25Okapi(tokenized)
+        self.bm25= BM25Okapi(tokenized)
         self.corpus = corpus
 
     def retrieve(self, query: str, k: int = 5) -> list[int]:
@@ -41,14 +41,14 @@ class DenseRetriever:
         import numpy as np
         self.np = np
         print("  Loading sentence-transformers (all-MiniLM-L6-v2)...")
-        self.model  = SentenceTransformer("all-MiniLM-L6-v2")
+        self.model= SentenceTransformer("all-MiniLM-L6-v2")
         self.corpus = corpus
         print(f"  Encoding {len(corpus)} documents...")
         self.embeddings = self.model.encode(corpus, show_progress_bar=True,
                                             convert_to_numpy=True, normalize_embeddings=True)
 
     def retrieve(self, query: str, k: int = 5) -> list[int]:
-        q_emb  = self.model.encode([query], normalize_embeddings=True)
+        q_emb= self.model.encode([query], normalize_embeddings=True)
         scores = (q_emb @ self.embeddings.T)[0]
         return sorted(range(len(scores)), key=lambda i: -scores[i])[:k]
 
@@ -69,18 +69,18 @@ def load_musique_with_corpus(max_samples: int | None) -> list[dict]:
             row = row.to_dict()
             paragraphs = row.get("paragraphs", [])
             if isinstance(paragraphs, dict):
-                titles    = paragraphs.get("title", [])
-                bodies    = paragraphs.get("paragraph_text", [])
+                titles = paragraphs.get("title", [])
+                bodies = paragraphs.get("paragraph_text", [])
             elif isinstance(paragraphs, list):
-                titles    = [p.get("title", "") if isinstance(p, dict) else "" for p in paragraphs]
-                bodies    = [p.get("paragraph_text", "") if isinstance(p, dict) else str(p) for p in paragraphs]
+                titles = [p.get("title", "") if isinstance(p, dict) else "" for p in paragraphs]
+                bodies = [p.get("paragraph_text", "") if isinstance(p, dict) else str(p) for p in paragraphs]
             else:
                 continue
 
             decomp = row.get("question_decomposition", [])
             if isinstance(decomp, dict):
                 keys = list(decomp.keys())
-                n    = len(decomp[keys[0]]) if keys else 0
+                n = len(decomp[keys[0]]) if keys else 0
                 decomp = [{k: decomp[k][i] for k in keys} for i in range(n)]
             elif not isinstance(decomp, list):
                 continue
@@ -104,11 +104,11 @@ def load_musique_with_corpus(max_samples: int | None) -> list[dict]:
                 continue
 
             examples.append({
-                "question":        question,
-                "corpus":          corpus,
+                "question":question,
+                "corpus":corpus,
                 "gold_para_idxs":  gold_para_idxs,
                 "gold_sub_queries": gold_sub_queries,
-                "answer":          row.get("answer", ""),
+                "answer":row.get("answer", ""),
             })
 
         print(f"  Loaded {len(examples)} examples with corpus")
@@ -122,30 +122,30 @@ def load_musique_with_corpus(max_samples: int | None) -> list[dict]:
 def _build_synthetic_examples():
     return [
         {
-            "question":     "Where was the director of Inception born?",
-            "corpus":       [
+            "question":"Where was the director of Inception born?",
+            "corpus":  [
                 "Inception: Inception is a 2010 film directed by Christopher Nolan.",
                 "Christopher Nolan: Christopher Nolan was born in London, England in 1970.",
                 "Avatar: Avatar is a 2009 film directed by James Cameron.",
                 "James Cameron: James Cameron was born in Kapuskasing, Ontario, Canada.",
                 "London: London is the capital city of England.",
             ],
-            "gold_para_idxs":   {0, 1},
+            "gold_para_idxs":{0, 1},
             "gold_sub_queries": ["Who directed Inception?", "Where was Christopher Nolan born?"],
-            "answer":           "London",
+            "answer":"London",
         },
         {
-            "question":     "What is the capital of the country where Einstein was born?",
-            "corpus":       [
+            "question":"What is the capital of the country where Einstein was born?",
+            "corpus":  [
                 "Einstein: Albert Einstein was born in Ulm, Germany in 1879.",
                 "Germany: Germany is a country in central Europe. Its capital is Berlin.",
                 "France: France is a country in Western Europe. Its capital is Paris.",
                 "Albert Einstein: He developed the theory of relativity.",
                 "Berlin: Berlin is the capital and largest city of Germany.",
             ],
-            "gold_para_idxs":   {0, 1},
+            "gold_para_idxs":{0, 1},
             "gold_sub_queries": ["In which country was Einstein born?", "What is the capital of Germany?"],
-            "answer":           "Berlin",
+            "answer":"Berlin",
         },
     ] * 10 
 
@@ -203,13 +203,13 @@ def evaluate_retrieval(
     predicted_sub_queries: list[list[str] | None] | None,
     ks: list[int] = [1, 3, 5],
 ) -> dict:
-    raw_hits   = defaultdict(list) 
+    raw_hits= defaultdict(list) 
     decomp_hits = defaultdict(list) 
 
     for i, ex in enumerate(examples):
-        corpus       = ex["corpus"]
-        gold_idxs    = ex["gold_para_idxs"]
-        question     = ex["question"]
+        corpus= ex["corpus"]
+        gold_idxs = ex["gold_para_idxs"]
+        question= ex["question"]
 
         if len(corpus) == 0 or len(gold_idxs) == 0:
             continue
@@ -249,9 +249,9 @@ def evaluate_retrieval(
     }
 
 def print_retrieval_results(results: dict):
-    raw    = results["raw"]
+    raw = results["raw"]
     decomp = results["decomposed"]
-    n      = results["n_examples"]
+    n = results["n_examples"]
 
     print(f"\n  Retrieval Results  ({n} examples)")
     print(f"  {'─'*52}")
@@ -262,12 +262,12 @@ def print_retrieval_results(results: dict):
         r = raw.get(metric, 0)
         d = decomp.get(metric, 0)
         delta = d - r
-        sign  = "+" if delta >= 0 else ""
+        sign= "+" if delta >= 0 else ""
         arrow = " ↑" if delta > 0.02 else (" ↓" if delta < -0.02 else "  ")
         print(f"  {metric:12}  {r:>14.1%}  {d:>12.1%}  {sign}{delta:.1%}{arrow}")
 
     print(f"  {'─'*52}")
-    avg_raw   = sum(raw.values())   / len(raw)   if raw   else 0
+    avg_raw= sum(raw.values())   / len(raw)   if raw   else 0
     avg_decomp= sum(decomp.values())/ len(decomp) if decomp else 0
     print(f"  {'avg':12}  {avg_raw:>14.1%}  {avg_decomp:>12.1%}  "
           f"{'+' if avg_decomp > avg_raw else ''}{avg_decomp-avg_raw:.1%}")
@@ -297,8 +297,8 @@ def main():
     retriever_class = BM25Retriever if args.retriever == "bm25" else DenseRetriever
 
     model_path = args.model or str(ROOT / "outputs" / "final")
-    questions  = [ex["question"] for ex in examples]
-    predicted  = get_predicted_sub_queries(model_path, questions)
+    questions= [ex["question"] for ex in examples]
+    predicted= get_predicted_sub_queries(model_path, questions)
 
     print(f"\n  Evaluating retrieval...")
     results = evaluate_retrieval(examples, retriever_class, predicted)
@@ -319,7 +319,7 @@ def main():
         except Exception:
             pass
 
-    h3_raw    = results["raw"].get("hit@3", 0)
+    h3_raw = results["raw"].get("hit@3", 0)
     h3_decomp = results["decomposed"].get("hit@3", 0)
     print(f"\n  Headline: hit@3  {h3_raw:.1%} → {h3_decomp:.1%}  "
           f"(+{h3_decomp - h3_raw:.1%})")

@@ -27,7 +27,7 @@ def token_f1(pred: str, gold: str) -> float:
     if not common:
         return 0.0
     precision = len(common) / len(pred_tokens)
-    recall    = len(common) / len(gold_tokens)
+    recall = len(common) / len(gold_tokens)
     return 2 * precision * recall / (precision + recall)
 
 def best_match_f1(pred_hops: list[dict], gold_hops: list[dict]) -> tuple[float, float, float]:
@@ -47,7 +47,7 @@ def best_match_f1(pred_hops: list[dict], gold_hops: list[dict]) -> tuple[float, 
         best = max(token_f1(p, g) for g in gold_texts)
         pred_scores.append(best)
 
-    recall    = sum(gold_scores) / len(gold_scores)
+    recall = sum(gold_scores) / len(gold_scores)
     precision = sum(pred_scores) / len(pred_scores)
     f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
     return precision, recall, f1
@@ -96,7 +96,7 @@ def run_model_on_examples(
     outputs = []
     for i, ex in enumerate(examples):
         messages = ex.get("messages", [])
-        question  = next((m["content"] for m in messages if m["role"] == "user"), "")
+        question= next((m["content"] for m in messages if m["role"] == "user"), "")
 
         prompt = build_prompt(question, tokenizer)
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
@@ -134,8 +134,8 @@ def evaluate(model_id: str, examples: list[dict], label: str) -> dict:
     per_hop_results = defaultdict(list)   
 
     for ex, raw in zip(examples, raw_outputs):
-        messages  = ex.get("messages", [])
-        gold_raw  = next((m["content"] for m in messages if m["role"] == "assistant"), "")
+        messages= ex.get("messages", [])
+        gold_raw= next((m["content"] for m in messages if m["role"] == "assistant"), "")
 
         try:
             gold_hops = json.loads(gold_raw)
@@ -178,9 +178,9 @@ def evaluate(model_id: str, examples: list[dict], label: str) -> dict:
         metrics["dep_graph_acc"].append(dep_ok)
 
     results = {k: round(sum(v) / len(v), 4) for k, v in metrics.items() if v}
-    results["n_examples"]  = len(examples)
-    results["n_failures"]  = dict(failures)
-    results["per_hop_f1"]  = {
+    results["n_examples"]= len(examples)
+    results["n_failures"]= dict(failures)
+    results["per_hop_f1"]= {
         str(k): round(sum(v) / len(v), 4)
         for k, v in per_hop_results.items() if v
     }
@@ -190,13 +190,13 @@ def evaluate(model_id: str, examples: list[dict], label: str) -> dict:
 def print_results(results: dict):
     label = results.get("label", "Model")
     print(f"\n  ┌─ {label} {'─' * (50 - len(label))}┐")
-    print(f"  │  n_examples:      {results.get('n_examples', 0):>6}                        │")
+    print(f"  │  n_examples: {results.get('n_examples', 0):>6}                        │")
     print(f"  │  json_parse_rate: {results.get('json_parse_rate', 0):>6.1%}  (% valid JSON output)   │")
-    print(f"  │  hop_count_acc:   {results.get('hop_count_acc', 0):>6.1%}  (right number of hops)  │")
-    print(f"  │  hop_precision:   {results.get('hop_precision', 0):>6.1%}                        │")
-    print(f"  │  hop_recall:      {results.get('hop_recall', 0):>6.1%}                        │")
+    print(f"  │  hop_count_acc:{results.get('hop_count_acc', 0):>6.1%}  (right number of hops)  │")
+    print(f"  │  hop_precision:{results.get('hop_precision', 0):>6.1%}                        │")
+    print(f"  │  hop_recall: {results.get('hop_recall', 0):>6.1%}                        │")
     print(f"  │  hop_coverage_f1: {results.get('hop_coverage_f1', 0):>6.1%}  ← HEADLINE METRIC      │")
-    print(f"  │  dep_graph_acc:   {results.get('dep_graph_acc', 0):>6.1%}  (parallel vs sequential)│")
+    print(f"  │  dep_graph_acc:{results.get('dep_graph_acc', 0):>6.1%}  (parallel vs sequential)│")
     print(f"  └{'─' * 54}┘")
 
     per_hop = results.get("per_hop_f1", {})
@@ -218,7 +218,7 @@ def print_comparison(baseline: dict, finetuned: dict):
         b = baseline.get(metric, 0)
         f = finetuned.get(metric, 0)
         delta = f - b
-        sign  = "+" if delta >= 0 else ""
+        sign= "+" if delta >= 0 else ""
         arrow = "↑" if delta > 0.01 else ("↓" if delta < -0.01 else "→")
         print(f"  {metric:20s}  {b:.1%} → {f:.1%}   {arrow} {sign}{delta:.1%}")
 

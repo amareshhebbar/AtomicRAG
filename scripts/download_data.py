@@ -14,17 +14,17 @@ except ImportError:
     print("  pip install datasets huggingface_hub tqdm")
     sys.exit(1)
 
-ROOT      = Path(__file__).resolve().parent.parent
-RAW_DIR   = ROOT / "data" / "raw"
-LOG_FILE  = ROOT / "data" / "download_log.json"
+ROOT = Path(__file__).resolve().parent.parent
+RAW_DIR= ROOT / "data" / "raw"
+LOG_FILE= ROOT / "data" / "download_log.json"
 
 
 DATASETS = {
     "musique": {
-        "hf_path":            "bdsaglam/musique",
-        "config":             "default",
-        "splits":             ["train", "validation"],
-        "local_dir":          RAW_DIR / "musique",
+        "hf_path": "bdsaglam/musique",
+        "config":"default",
+        "splits":["train", "validation"],
+        "local_dir":RAW_DIR / "musique",
         "trust_remote_code":  False,
         "description": (
             "MuSiQue — Gold standard. Explicit question_decomposition field with "
@@ -32,10 +32,10 @@ DATASETS = {
         ),
     },
     "hotpotqa": {
-        "hf_path":            "hotpotqa/hotpot_qa",
-        "config":             "distractor",
-        "splits":             ["train", "validation"],
-        "local_dir":          RAW_DIR / "hotpotqa",
+        "hf_path": "hotpotqa/hotpot_qa",
+        "config":"distractor",
+        "splits":["train", "validation"],
+        "local_dir":RAW_DIR / "hotpotqa",
         "trust_remote_code":  False,
         "description": (
             "HotpotQA (distractor setting) — 113K 2-hop questions with supporting "
@@ -43,10 +43,10 @@ DATASETS = {
         ),
     },
     "2wikimultihopqa": {
-        "hf_path":            "framolfese/2WikiMultihopQA",
-        "config":             None,
-        "splits":             ["train", "validation", "test"],
-        "local_dir":          RAW_DIR / "2wikimultihopqa",
+        "hf_path": "framolfese/2WikiMultihopQA",
+        "config":None,
+        "splits":["train", "validation", "test"],
+        "local_dir":RAW_DIR / "2wikimultihopqa",
         "trust_remote_code":  False,
         "description": (
             "2WikiMultiHopQA — 167K examples across 4 reasoning types: bridge, "
@@ -64,14 +64,14 @@ def print_banner(text: str):
 
 def save_dataset_info(name: str, dataset: DatasetDict, local_dir: Path):
     info = {
-        "name":           name,
+        "name":name,
         "downloaded_at":  datetime.utcnow().isoformat() + "Z",
-        "splits":         {},
+        "splits": {},
     }
     for split, ds in dataset.items():
         info["splits"][split] = {
-            "num_rows":    len(ds),
-            "features":    {k: str(v) for k, v in ds.features.items()},
+            "num_rows": len(ds),
+            "features": {k: str(v) for k, v in ds.features.items()},
             "column_names": ds.column_names,
         }
     info_path = local_dir / "dataset_info.json"
@@ -82,10 +82,10 @@ def save_dataset_info(name: str, dataset: DatasetDict, local_dir: Path):
 
 def download_one(name: str, cfg: dict, dry_run: bool = False) -> bool:
     print_banner(f"Dataset: {name.upper()}")
-    print(f"  HF path:     {cfg['hf_path']}")
-    print(f"  Config:      {cfg['config'] or 'default'}")
-    print(f"  Splits:      {', '.join(cfg['splits'])}")
-    print(f"  Local dir:   {cfg['local_dir'].relative_to(ROOT)}")
+    print(f"  HF path:{cfg['hf_path']}")
+    print(f"  Config: {cfg['config'] or 'default'}")
+    print(f"  Splits: {', '.join(cfg['splits'])}")
+    print(f"  Local dir:{cfg['local_dir'].relative_to(ROOT)}")
     print(f"  Description: {cfg['description']}")
 
     if dry_run:
@@ -114,8 +114,8 @@ def download_one(name: str, cfg: dict, dry_run: bool = False) -> bool:
         dataset = load_dataset(**load_kwargs)
 
         available_splits = list(dataset.keys())
-        requested        = cfg["splits"]
-        missing          = [s for s in requested if s not in available_splits]
+        requested= cfg["splits"]
+        missing= [s for s in requested if s not in available_splits]
         if missing:
             print(f"  ⚠  Splits not found: {missing}. Available: {available_splits}")
 
@@ -139,7 +139,7 @@ def download_one(name: str, cfg: dict, dry_run: bool = False) -> bool:
 def write_download_log(results: dict):
     log = {
         "timestamp": datetime.utcnow().isoformat() + "Z",
-        "results":   results,
+        "results":results,
     }
     with open(LOG_FILE, "w") as f:
         json.dump(log, f, indent=2)
@@ -148,7 +148,7 @@ def write_download_log(results: dict):
 
 def print_summary(results: dict):
     print_banner("DOWNLOAD SUMMARY")
-    ok  = [k for k, v in results.items() if v]
+    ok= [k for k, v in results.items() if v]
     err = [k for k, v in results.items() if not v]
     print(f"  Success: {', '.join(ok) if ok else 'none'}")
     print(f"  Failed:  {', '.join(err) if err else 'none'}")

@@ -24,14 +24,14 @@ class SFTDataset(Dataset):
     def __init__(
         self,
         hf_dataset_path: str,
-        tokenizer:        "PreTrainedTokenizer",
-        cfg:              BaseConfig,
-        split:            str = "train",
-        max_samples:      Optional[int] = None,
+        tokenizer:"PreTrainedTokenizer",
+        cfg: BaseConfig,
+        split: str = "train",
+        max_samples: Optional[int] = None,
     ):
-        self.tokenizer   = tokenizer
-        self.max_length  = cfg.max_seq_length
-        self.split       = split
+        self.tokenizer= tokenizer
+        self.max_length= cfg.max_seq_length
+        self.split= split
 
         dsd = load_from_disk(hf_dataset_path)
 
@@ -78,7 +78,7 @@ class SFTDataset(Dataset):
         )
 
         prompt_messages = [m for m in messages if m["role"] != "assistant"]
-        prompt_text     = self.tokenizer.apply_chat_template(
+        prompt_text= self.tokenizer.apply_chat_template(
             prompt_messages,
             tokenize=False,
             add_generation_prompt=True,   
@@ -104,16 +104,16 @@ class SFTDataset(Dataset):
         prompt_len = len(prompt_tokenized["input_ids"])
 
         input_ids = tokenized["input_ids"]
-        labels    = [-100] * prompt_len + input_ids[prompt_len:]
+        labels = [-100] * prompt_len + input_ids[prompt_len:]
 
         assert len(labels) == len(input_ids), (
             f"Label length mismatch: {len(labels)} vs {len(input_ids)}"
         )
 
         return {
-            "input_ids":      torch.tensor(input_ids,                   dtype=torch.long),
+            "input_ids": torch.tensor(input_ids,                   dtype=torch.long),
             "attention_mask": torch.tensor(tokenized["attention_mask"], dtype=torch.long),
-            "labels":         torch.tensor(labels,                      dtype=torch.long),
+            "labels": torch.tensor(labels,                      dtype=torch.long),
         }
 
     def __len__(self) -> int:
@@ -128,12 +128,12 @@ class ORPODataset(Dataset):
     def __init__(
         self,
         hf_dataset_path: str,
-        tokenizer:        "PreTrainedTokenizer",
-        cfg:              BaseConfig,
-        split:            str = "train",
-        max_samples:      Optional[int] = None,
+        tokenizer:"PreTrainedTokenizer",
+        cfg: BaseConfig,
+        split: str = "train",
+        max_samples: Optional[int] = None,
     ):
-        self.tokenizer  = tokenizer
+        self.tokenizer= tokenizer
         self.max_length = cfg.max_seq_length
 
         dsd = load_from_disk(hf_dataset_path)
@@ -157,7 +157,7 @@ class ORPODataset(Dataset):
     def _build_one(self, row: dict) -> Optional[dict]:
         try:
             question = row["question"]
-            chosen   = row["chosen_json"]
+            chosen= row["chosen_json"]
             rejected = row["rejected_json"]
         except KeyError:
             return None
@@ -175,10 +175,10 @@ class ORPODataset(Dataset):
         )
 
         return {
-            "prompt":            prompt,
-            "chosen":            chosen.strip(),
-            "rejected":          rejected.strip(),
-            "rejection_type":    row.get("rejection_type", "unknown"),
+            "prompt": prompt,
+            "chosen": chosen.strip(),
+            "rejected":rejected.strip(),
+            "rejection_type": row.get("rejection_type", "unknown"),
         }
 
     def _build_all(self, hf_ds: "HFDataset") -> list[dict]:
@@ -213,12 +213,12 @@ def get_sft_collator(tokenizer: "PreTrainedTokenizer", max_length: int):
 
 def decode_batch_sample(batch: dict, tokenizer, idx: int = 0) -> str:
     input_ids = batch["input_ids"][idx].tolist()
-    labels    = batch["labels"][idx].tolist()
+    labels = batch["labels"][idx].tolist()
 
-    prompt_tokens    = [t for t, l in zip(input_ids, labels) if l == -100]
+    prompt_tokens = [t for t, l in zip(input_ids, labels) if l == -100]
     assistant_tokens = [t for t, l in zip(input_ids, labels) if l != -100]
 
-    prompt_text    = tokenizer.decode(prompt_tokens,    skip_special_tokens=False)
+    prompt_text = tokenizer.decode(prompt_tokens,    skip_special_tokens=False)
     assistant_text = tokenizer.decode(assistant_tokens, skip_special_tokens=False)
 
     return (
@@ -247,7 +247,7 @@ if __name__ == "__main__":
     from transformers import AutoTokenizer
     from src.config import get_config
 
-    cfg       = get_config("local_test")
+    cfg= get_config("local_test")
     tokenizer = AutoTokenizer.from_pretrained(
         cfg.base_model_id,
         trust_remote_code=True,
@@ -267,14 +267,14 @@ if __name__ == "__main__":
     print(f"\nDataset length: {len(ds)}")
     if len(ds) > 0:
         ex = ds[0]
-        print(f"input_ids shape:      {ex['input_ids'].shape}")
+        print(f"input_ids shape: {ex['input_ids'].shape}")
         print(f"attention_mask shape: {ex['attention_mask'].shape}")
-        print(f"labels shape:         {ex['labels'].shape}")
+        print(f"labels shape: {ex['labels'].shape}")
 
-        labels    = ex["labels"].tolist()
-        masked    = sum(1 for l in labels if l == -100)
-        unmasked  = sum(1 for l in labels if l != -100)
-        print(f"Masked tokens (prompt):     {masked}")
+        labels = ex["labels"].tolist()
+        masked = sum(1 for l in labels if l == -100)
+        unmasked= sum(1 for l in labels if l != -100)
+        print(f"Masked tokens (prompt):{masked}")
         print(f"Unmasked tokens (assistant): {unmasked}")
         assert unmasked > 0, "No assistant tokens found — label masking broken!"
 

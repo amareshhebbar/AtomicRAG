@@ -12,9 +12,9 @@ except ImportError:
     print("[ERROR] Run: pip install datasets pandas tqdm")
     sys.exit(1)
 
-ROOT     = Path(__file__).resolve().parent.parent
-RAW_DIR  = ROOT / "data" / "raw" / "2wikimultihopqa"
-OUT_DIR  = ROOT / "data" / "processed"
+ROOT= Path(__file__).resolve().parent.parent
+RAW_DIR= ROOT / "data" / "raw" / "2wikimultihopqa"
+OUT_DIR= ROOT / "data" / "processed"
 
 SYSTEM_PROMPT = (
     "You are a query decomposition engine. "
@@ -29,10 +29,10 @@ SYSTEM_PROMPT = (
 )
 
 TYPE_COMPLEXITY_MAP = {
-    "bridge":       "bridge_2hop",
-    "comparison":   "comparison_2hop",
+    "bridge":  "bridge_2hop",
+    "comparison":"comparison_2hop",
     "compositional":"compositional_2hop",
-    "inference":    "inference_2hop",
+    "inference": "inference_2hop",
 }
 
 
@@ -44,7 +44,7 @@ def get_evidence_titles(row: dict) -> list[str]:
         titles = [e.get("title", "") if isinstance(e, dict) else "" for e in evidences]
     else:
         titles = []
-    seen   = set()
+    seen= set()
     unique = []
     for t in titles:
         if t and t not in seen:
@@ -62,12 +62,12 @@ def build_decomposition(question: str, q_type: str, titles: list[str]) -> list[d
     if q_type in ("bridge", "compositional"):
         return [
             {
-                "hop":        1,
+                "hop":1,
                 "sub_query":  f"What information does {t1} provide relevant to: {question}",
                 "depends_on": [],
             },
             {
-                "hop":        2,
+                "hop":2,
                 "sub_query":  f"Using the information from {t1}, {question}",
                 "depends_on": [1],
             },
@@ -75,12 +75,12 @@ def build_decomposition(question: str, q_type: str, titles: list[str]) -> list[d
     else:
         return [
             {
-                "hop":        1,
+                "hop":1,
                 "sub_query":  f"What relevant fact about {t1} relates to: {question}",
                 "depends_on": [],
             },
             {
-                "hop":        2,
+                "hop":2,
                 "sub_query":  f"What relevant fact about {t2} relates to: {question}",
                 "depends_on": [],
             },
@@ -89,30 +89,30 @@ def build_decomposition(question: str, q_type: str, titles: list[str]) -> list[d
 
 def process_row(row: dict, idx: int, split: str) -> Optional[dict]:
     question = row.get("question", "").strip()
-    answer   = row.get("answer",   "").strip()
-    q_type   = row.get("type",     "bridge").lower().strip()
+    answer= row.get("answer",   "").strip()
+    q_type= row.get("type",     "bridge").lower().strip()
 
     if not question:
         return None
 
-    titles    = get_evidence_titles(row)
+    titles = get_evidence_titles(row)
     dep_graph = build_decomposition(question, q_type, titles)
-    messages  = [
+    messages= [
         {"role": "system",    "content": SYSTEM_PROMPT},
         {"role": "user",      "content": question},
         {"role": "assistant", "content": json.dumps(dep_graph, ensure_ascii=False)},
     ]
 
     return {
-        "id":                  f"2wiki_{split}_{idx:06d}",
-        "domain":              "wikipedia",
-        "source":              "2wikimultihopqa",
-        "hop_count":           2,
-        "complexity":          TYPE_COMPLEXITY_MAP.get(q_type, "bridge_2hop"),
-        "messages":            messages,
+        "id":f"2wiki_{split}_{idx:06d}",
+        "domain": "wikipedia",
+        "source": "2wikimultihopqa",
+        "hop_count":2,
+        "complexity":TYPE_COMPLEXITY_MAP.get(q_type, "bridge_2hop"),
+        "messages": messages,
         "ground_truth_answer": answer,
-        "supporting_facts":    titles,
-        "quality_tier":        "heuristic",
+        "supporting_facts": titles,
+        "quality_tier":"heuristic",
     }
 
 
@@ -128,8 +128,8 @@ def process_split(split: str, max_rows: Optional[int]) -> list[dict]:
         df = df.head(max_rows)
     print(f"  Rows: {len(df):,}")
 
-    examples    = []
-    skipped     = 0
+    examples = []
+    skipped= 0
     type_counts = {}
 
     for idx, row in tqdm(df.iterrows(), total=len(df), desc=f"  Processing {split}"):
@@ -142,7 +142,7 @@ def process_split(split: str, max_rows: Optional[int]) -> list[dict]:
         type_counts[c] = type_counts.get(c, 0) + 1
 
     print(f"  ✓ Converted:  {len(examples):,}  ✗ Skipped: {skipped:,}")
-    print(f"  Types:        {type_counts}")
+    print(f"  Types:{type_counts}")
     return examples
 
 

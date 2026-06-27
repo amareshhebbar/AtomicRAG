@@ -55,7 +55,7 @@ def benchmark_model(
     )
     model.eval()
 
-    latencies_ms     = []
+    latencies_ms= []
     output_token_counts = []
 
     print(f"  Warming up (3 runs)...")
@@ -102,28 +102,28 @@ def benchmark_model(
         if (i + 1) % 10 == 0:
             print(f"  Progress: {i+1}/{n_runs}  last={elapsed_ms:.0f}ms")
 
-    p50  = statistics.median(latencies_ms)
-    p95  = statistics.quantiles(latencies_ms, n=20)[18] 
-    p99  = statistics.quantiles(latencies_ms, n=100)[98] 
+    p50= statistics.median(latencies_ms)
+    p95= statistics.quantiles(latencies_ms, n=20)[18] 
+    p99= statistics.quantiles(latencies_ms, n=100)[98] 
     mean = statistics.mean(latencies_ms)
     avg_tokens = statistics.mean(output_token_counts)
     tps = avg_tokens / (mean / 1000)
 
     cost_per_query = (mean / 1000) * (0.22 / 3600)
-    cost_per_1k    = cost_per_query * 1000
+    cost_per_1k = cost_per_query * 1000
 
     result = {
-        "label":              label,
-        "model_id":           model_id,
-        "n_runs":             n_runs,
-        "device":             device,
-        "p50_ms":             round(p50, 1),
-        "p95_ms":             round(p95, 1),
-        "p99_ms":             round(p99, 1),
-        "mean_ms":            round(mean, 1),
+        "label": label,
+        "model_id":model_id,
+        "n_runs":n_runs,
+        "device":device,
+        "p50_ms":round(p50, 1),
+        "p95_ms":round(p95, 1),
+        "p99_ms":round(p99, 1),
+        "mean_ms": round(mean, 1),
         "tokens_per_second":  round(tps, 1),
         "avg_output_tokens":  round(avg_tokens, 1),
-        "cost_per_1k_usd":    round(cost_per_1k, 4),
+        "cost_per_1k_usd": round(cost_per_1k, 4),
     }
 
     print(f"  ✓ Done")
@@ -132,22 +132,22 @@ def benchmark_model(
 
 REFERENCE_BENCHMARKS = {
     "GPT-4o (API, prompted)": {
-        "label":             "GPT-4o (API, prompted)",
-        "p50_ms":            1800,
-        "p95_ms":            3200,
-        "mean_ms":           2000,
+        "label":"GPT-4o (API, prompted)",
+        "p50_ms": 1800,
+        "p95_ms": 3200,
+        "mean_ms":2000,
         "tokens_per_second": 60,
-        "cost_per_1k_usd":   30.0,  
-        "source":            "OpenAI pricing + typical TTFT benchmarks",
+        "cost_per_1k_usd":30.0,  
+        "source": "OpenAI pricing + typical TTFT benchmarks",
     },
     "GPT-3.5-turbo (API)": {
-        "label":             "GPT-3.5-turbo (API, prompted)",
-        "p50_ms":            600,
-        "p95_ms":            1200,
-        "mean_ms":           700,
+        "label":"GPT-3.5-turbo (API, prompted)",
+        "p50_ms": 600,
+        "p95_ms": 1200,
+        "mean_ms":700,
         "tokens_per_second": 90,
-        "cost_per_1k_usd":   0.5,
-        "source":            "OpenAI pricing",
+        "cost_per_1k_usd":0.5,
+        "source": "OpenAI pricing",
     },
 }
 
@@ -161,10 +161,10 @@ def print_benchmark_table(results: list[dict]):
             print(f"  {r['label']:35}  ERROR: {r['error']}")
             continue
         label = r["label"][:35]
-        p50   = f"{r.get('p50_ms', 0):.0f}ms"
-        p95   = f"{r.get('p95_ms', 0):.0f}ms"
-        tps   = f"{r.get('tokens_per_second', 0):.0f}"
-        cost  = f"${r.get('cost_per_1k_usd', 0):.2f}"
+        p50= f"{r.get('p50_ms', 0):.0f}ms"
+        p95= f"{r.get('p95_ms', 0):.0f}ms"
+        tps= f"{r.get('tokens_per_second', 0):.0f}"
+        cost= f"${r.get('cost_per_1k_usd', 0):.2f}"
         print(f"  {label:35}  {p50:>6}  {p95:>6}  {tps:>6}  {cost:>8}")
 
     print(f"  {'─'*70}")
@@ -177,7 +177,7 @@ def print_speedup(baseline: dict, finetuned: dict):
     cost_savings = 1 - (finetuned.get("cost_per_1k_usd", 0) /
                         max(baseline.get("cost_per_1k_usd", 1), 0.001))
     print(f"\n  vs GPT-4o:")
-    print(f"    Speedup:      {speedup:.0f}x faster")
+    print(f"    Speedup: {speedup:.0f}x faster")
     print(f"    Cost savings: {cost_savings:.1%} cheaper per 1k queries")
 
 def main():
@@ -229,9 +229,9 @@ def main():
             import wandb
             if wandb.run:
                 wandb.log({
-                    "speed/p50_ms":   ft_result["p50_ms"],
-                    "speed/p95_ms":   ft_result["p95_ms"],
-                    "speed/tps":      ft_result["tokens_per_second"],
+                    "speed/p50_ms":ft_result["p50_ms"],
+                    "speed/p95_ms":ft_result["p95_ms"],
+                    "speed/tps": ft_result["tokens_per_second"],
                     "speed/cost_1k":  ft_result["cost_per_1k_usd"],
                 })
         except Exception:
