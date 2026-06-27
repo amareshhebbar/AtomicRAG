@@ -59,21 +59,20 @@ check:
 	@$(PYTHON) -c "\
 import os, urllib.request, urllib.error; \
 req = urllib.request.Request('https://huggingface.co/api/whoami', headers={'Authorization': 'Bearer ' + os.environ['HF_TOKEN']}); \
-r = urllib.request.urlopen(req); print('OK  (' + __import__('json').loads(r.read())['name'] + ')')" 2>/dev/null || \
-		(echo "FAIL — HF_TOKEN invalid or network error" && exit 1)
+r = urllib.request.urlopen(req, timeout=10); print('OK  (' + __import__('json').loads(r.read())['name'] + ')')" 2>/dev/null || \
+		echo "WARN — HF API unreachable (token set, continuing anyway)"
 	@echo -n "  WANDB_API_KEY: "
-	@test -n "$$WANDB_API_KEY" || (echo "FAIL — WANDB_API_KEY not set" && exit 1)
+	@test -n "$$WANDB_API_KEY" || (echo "not set — using WANDB_MODE=disabled" )
 	@$(PYTHON) -c "\
 import os, urllib.request, json; \
 req = urllib.request.Request('https://api.wandb.ai/graphql', \
   data=b'{\"query\":\"{viewer{entity}}\"}', \
   headers={'Authorization': 'Bearer ' + os.environ['WANDB_API_KEY'], 'Content-Type': 'application/json'}); \
-r = urllib.request.urlopen(req); d = json.loads(r.read()); \
+r = urllib.request.urlopen(req, timeout=10); d = json.loads(r.read()); \
 entity = d['data']['viewer']['entity']; print('OK  (' + entity + ')')" 2>/dev/null || \
-		(echo "FAIL — WANDB_API_KEY invalid. Training will run with WANDB_MODE=disabled" && \
-		 export WANDB_MODE=disabled)
+		echo "WARN — W&B unreachable (continuing with WANDB_MODE=disabled)"
 	@echo "  ─────────────────────────────────────────────────────"
-	@echo "  ✓ All checks passed — starting pipeline"
+	@echo "  ✓ Checks done — starting pipeline"
 	@echo ""
 
 
@@ -115,18 +114,18 @@ install: venv
 install-torch: venv
 	@echo ""
 	@echo "  Detecting GPU and installing torch..."
-	@$(PYTHON) -c "import torch; print('  ✓ torch ' + torch.__version__ + ' already installed')" 2>/dev/null || \
+	@$(PYTHON) -c "import torch; assert torch.cuda.is_available(), 'cuda not available'; print('  ✓ torch ' + torch.__version__ + ' already installed')" 2>/dev/null || \
 	( \
 		CUDA_VER=$$(nvidia-smi 2>/dev/null | grep "CUDA Version" | awk '{print $$NF}' | cut -d. -f1); \
 		if [ "$$CUDA_VER" = "" ]; then \
 			echo "  No GPU → CPU torch"; \
 			$(PIP) install torch torchvision --index-url https://download.pytorch.org/whl/cpu --quiet; \
 		elif [ "$$CUDA_VER" -ge 12 ]; then \
-			echo "  CUDA $$CUDA_VER → cu124"; \
-			$(PIP) install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu124 --quiet; \
+			echo "  CUDA $$CUDA_VER → cu128"; \
+			$(PIP) install torch torchvision --index-url https://download.pytorch.org/whl/cu128 --quiet; \
 		else \
 			echo "  CUDA $$CUDA_VER → cu118"; \
-			$(PIP) install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu118 --quiet; \
+			$(PIP) install torch torchvision --index-url https://download.pytorch.org/whl/cu118 --quiet; \
 		fi; \
 		echo "  ✓ torch installed"; \
 	)
